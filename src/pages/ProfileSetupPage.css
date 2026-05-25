@@ -1,0 +1,18 @@
+.profile-setup-page {
+  min-height: 100vh;
+  padding-top: 72px;
+  background: var(--bg-muted);
+}
+
+.profile-setup-page__header {
+  text-align: center;
+  padding: 40px 24px 0;
+}
+
+.profile-setup-page__header h1 {
+  margin-bottom: 8px;
+}
+
+.profile-setup-page__header p {
+  font-size: 1.05rem;
+}

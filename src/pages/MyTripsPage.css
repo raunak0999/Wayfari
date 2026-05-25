@@ -1,0 +1,109 @@
+.trips-page {
+  padding-top: 120px;
+  padding-bottom: 80px;
+  min-height: 100vh;
+}
+
+.trips-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.trips-page__header h1 {
+  margin-bottom: 4px;
+}
+
+.trips-page__header p {
+  font-size: 1rem;
+}
+
+/* Trip Cards */
+.trips-page .card {
+  transition: var(--transition);
+}
+
+.trips-page .card:hover {
+  transform: translateY(-8px) rotateX(2deg) rotateY(-1deg);
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(0,0,0,0.06);
+}
+
+.trip-card__destination {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.trip-card__dates {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  margin-bottom: 12px;
+}
+
+.trip-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.trip-card__status--active {
+  background: rgba(52,211,153,0.12);
+  color: var(--success);
+  border: 1px solid rgba(52,211,153,0.2);
+  box-shadow: 0 0 10px rgba(52,211,153,0.1);
+}
+
+.trip-card__status--upcoming {
+  background: rgba(96,165,250,0.12);
+  color: var(--info);
+  border: 1px solid rgba(96,165,250,0.2);
+}
+
+.trip-card__status--completed {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* Empty State */
+.trips-page__empty {
+  text-align: center;
+  padding: 80px 32px;
+}
+
+.trips-page__empty-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 20px;
+  animation: float 5s ease-in-out infinite;
+}
+
+.trips-page__empty h3 {
+  margin-bottom: 10px;
+  font-size: 1.4rem;
+}
+
+.trips-page__empty p {
+  margin-bottom: 28px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 768px) {
+  .trips-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

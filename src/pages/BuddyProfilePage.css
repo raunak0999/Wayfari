@@ -1,0 +1,184 @@
+.buddy-profile {
+  padding: 100px 0 60px;
+  min-height: 100vh;
+}
+
+/* Hero Card */
+.buddy-profile__hero {
+  display: flex;
+  gap: 40px;
+  padding: 40px;
+  margin-bottom: 32px;
+}
+
+.buddy-profile__avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.buddy-profile__avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(255, 107, 44, 0.25), 0 0 40px rgba(255, 107, 44, 0.1);
+  flex-shrink: 0;
+  border: 3px solid rgba(255, 107, 44, 0.3);
+}
+
+.buddy-profile__avatar span {
+  color: white;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 3.5rem;
+}
+
+.buddy-profile__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.buddy-profile__safety-badge {
+  background: rgba(255, 107, 44, 0.1);
+  color: var(--primary-light);
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 107, 44, 0.2);
+}
+
+.buddy-profile__info {
+  flex: 1;
+}
+
+.buddy-profile__info h1 {
+  margin-bottom: 4px;
+  font-size: 2rem;
+}
+
+.buddy-profile__location {
+  font-size: 1rem;
+  color: var(--text-secondary) !important;
+  margin-bottom: 16px;
+}
+
+.buddy-profile__bio {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin-bottom: 20px;
+  color: var(--text-secondary);
+}
+
+.buddy-profile__compat {
+  margin-bottom: 24px;
+}
+
+.buddy-profile__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Details Grid */
+.buddy-profile__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.buddy-profile__grid .card {
+  padding: 32px;
+}
+
+.buddy-profile__grid h3 {
+  margin-bottom: 20px;
+  font-size: 1.15rem;
+}
+
+.buddy-profile__detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.buddy-profile__detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.buddy-profile__detail-item span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.buddy-profile__detail-item strong {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+/* Compatibility */
+.buddy-profile__compat-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.buddy-profile__compat-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.buddy-profile__compat-section h4 {
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}
+
+.buddy-profile__chips-compare {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.buddy-profile__match-text {
+  font-size: 0.85rem;
+  color: var(--success) !important;
+  font-weight: 600;
+}
+
+.buddy-profile__lifestyle-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .buddy-profile__hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 28px;
+  }
+
+  .buddy-profile__actions {
+    justify-content: center;
+  }
+
+  .buddy-profile__grid {
+    grid-template-columns: 1fr;
+  }
+}

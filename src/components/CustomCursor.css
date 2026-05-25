@@ -1,0 +1,61 @@
+/* Custom Cursor - keep default cursor visible, add subtle custom ring */
+.cursor-ring {
+  position: fixed;
+  top: 0; left: 0;
+  width: 40px; height: 40px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 0.3s ease,
+              background 0.3s ease,
+              opacity 0.3s ease;
+  mix-blend-mode: difference;
+  will-change: transform;
+}
+
+.cursor-ring.hover {
+  width: 56px; height: 56px;
+  border-color: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.04);
+  margin-left: -8px;
+  margin-top: -8px;
+}
+
+.cursor-ring.click {
+  width: 32px; height: 32px;
+  border-color: #333;
+}
+
+.cursor-ring.hidden { opacity: 0; }
+
+.cursor-dot {
+  position: fixed;
+  top: 0; left: 0;
+  width: 8px; height: 8px;
+  background: #111;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  transition: width 0.2s ease, height 0.2s ease, background 0.2s ease, opacity 0.3s ease;
+  will-change: transform;
+}
+
+.cursor-dot.hover {
+  width: 4px; height: 4px;
+  background: #333;
+}
+
+.cursor-dot.click {
+  width: 12px; height: 12px;
+  background: #555;
+}
+
+.cursor-dot.hidden { opacity: 0; }
+
+/* Hide custom cursor on touch devices */
+@media (pointer: coarse) {
+  .cursor-ring, .cursor-dot { display: none !important; }
+}
