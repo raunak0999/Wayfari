@@ -9,6 +9,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState('signup');
   const [form, setForm] = useState({ name: '', email: '', password: '', gender: '' });
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const { signup, login } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
@@ -21,6 +22,7 @@ export default function AuthPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     setSubmitting(true);
     try {
       if (mode === 'signup') {
@@ -30,8 +32,13 @@ export default function AuthPage() {
           return;
         }
         const result = await signup(form.name, form.email, form.password, form.gender);
-        if (result.success) navigate('/profile-setup');
-        else setError(result.error);
+        if (result.needsConfirmation) {
+          setSuccessMsg(result.message);
+        } else if (result.success) {
+          navigate('/profile-setup');
+        } else {
+          setError(result.error);
+        }
       } else {
         if (!form.email || !form.password) {
           setError('Please fill in all fields');
@@ -43,7 +50,8 @@ export default function AuthPage() {
         else setError(result.error);
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong');
+      const msg = typeof err === 'string' ? err : (err?.message || 'Something went wrong. Please try again.');
+      setError(msg === '{}' || msg === '' ? 'Something went wrong. Please try again.' : msg);
     } finally {
       setSubmitting(false);
     }
@@ -86,6 +94,7 @@ export default function AuthPage() {
           </p>
 
           {error && <div className="auth-page__error">{error}</div>}
+          {successMsg && <div className="auth-page__success">{successMsg}</div>}
 
           <form onSubmit={handleSubmit}>
             {mode === 'signup' && (

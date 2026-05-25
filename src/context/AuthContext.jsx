@@ -3,6 +3,20 @@ import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
+// Normalize any error into a user-friendly string
+const getErrorMessage = (err) => {
+  if (!err) return 'Something went wrong. Please try again.';
+  if (typeof err === 'string') return err;
+  if (err.message && typeof err.message === 'string' && err.message.length > 0) return err.message;
+  if (err.error_description) return err.error_description;
+  if (err.msg) return err.msg;
+  try {
+    const str = JSON.stringify(err);
+    if (str && str !== '{}') return str;
+  } catch { /* ignore */ }
+  return 'Something went wrong. Please try again.';
+};
+
 const STORAGE_KEY = 'wayfari_auth';
 const PROFILES_KEY = 'wayfari_profiles';
 
@@ -104,11 +118,21 @@ export function AuthProvider({ children }) {
           email,
           password,
           options: {
-            data: { name, gender: gender.toLowerCase() }
+            data: { name, gender: gender.toLowerCase() },
+            emailRedirectTo: window.location.origin + '/auth'
           }
         });
 
-        if (error) return { success: false, error: error.message };
+        if (error) {
+          const msg = getErrorMessage(error);
+          if (msg.toLowerCase().includes('rate limit')) {
+            return { success: false, error: 'Too many attempts. Please wait a few minutes before trying again.' };
+          }
+          if (msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('504')) {
+            return { success: false, error: 'The server took too long to respond. Please try again in a moment.' };
+          }
+          return { success: false, error: msg };
+        }
 
         if (data.user) {
           const { error: profileError } = await supabase.from('profiles').upsert({
@@ -123,13 +147,22 @@ export function AuthProvider({ children }) {
             console.error('Profile creation error:', profileError);
           }
 
+          // If email confirmation is required (user exists but session is null)
+          if (!data.session) {
+            return {
+              success: true,
+              needsConfirmation: true,
+              message: 'Account created! Please check your email and click the confirmation link to activate your account.'
+            };
+          }
+
           setUser(data.user);
           await loadProfile(data.user.id);
         }
 
         return { success: true };
       } catch (err) {
-        return { success: false, error: err.message };
+        return { success: false, error: getErrorMessage(err) };
       }
     }
 
@@ -171,13 +204,25 @@ export function AuthProvider({ children }) {
           password
         });
 
-        if (error) return { success: false, error: error.message };
+        if (error) {
+          const msg = getErrorMessage(error);
+          if (msg.toLowerCase().includes('email not confirmed')) {
+            return { success: false, error: 'Your email is not verified yet. Please check your inbox (and spam folder) for the confirmation link.' };
+          }
+          if (msg.toLowerCase().includes('rate limit')) {
+            return { success: false, error: 'Too many attempts. Please wait a few minutes before trying again.' };
+          }
+          if (msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('504')) {
+            return { success: false, error: 'The server took too long to respond. Please try again in a moment.' };
+          }
+          return { success: false, error: msg };
+        }
 
         setUser(data.user);
         await loadProfile(data.user.id);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err.message };
+        return { success: false, error: getErrorMessage(err) };
       }
     }
 

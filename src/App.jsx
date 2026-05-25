@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
 import { TripProvider } from './context/TripContext';
 import { BuddyProvider } from './context/BuddyContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Navbar from './components/Navbar';
 import CustomCursor from './components/CustomCursor';
@@ -38,7 +39,9 @@ function AppRoutes() {
           path="/profile-setup"
           element={
             <ProtectedRoute>
-              <ProfileSetupPage />
+              <ErrorBoundary>
+                <ProfileSetupPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -46,7 +49,9 @@ function AppRoutes() {
           path="/find-buddies"
           element={
             <ProtectedRoute>
-              <FindBuddiesPage />
+              <ErrorBoundary>
+                <FindBuddiesPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -54,7 +59,9 @@ function AppRoutes() {
           path="/my-trips"
           element={
             <ProtectedRoute>
-              <MyTripsPage />
+              <ErrorBoundary>
+                <MyTripsPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -62,7 +69,9 @@ function AppRoutes() {
           path="/safety-hub"
           element={
             <ProtectedRoute>
-              <SafetyHubPage />
+              <ErrorBoundary>
+                <SafetyHubPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -70,7 +79,9 @@ function AppRoutes() {
           path="/buddy/:id"
           element={
             <ProtectedRoute>
-              <BuddyProfilePage />
+              <ErrorBoundary>
+                <BuddyProfilePage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -78,7 +89,9 @@ function AppRoutes() {
           path="/chat"
           element={
             <ProtectedRoute>
-              <ChatPage />
+              <ErrorBoundary>
+                <ChatPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
