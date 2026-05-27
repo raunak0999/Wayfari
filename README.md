@@ -57,7 +57,7 @@
 | **Animation** | GSAP 3 + ScrollTrigger + Framer Motion |
 | **Backend** | Supabase (Authentication + PostgreSQL) |
 | **Routing** | React Router v7 |
-| **Deployment** | Vercel |
+| **Deployment** | Render |
 
 ---
 
