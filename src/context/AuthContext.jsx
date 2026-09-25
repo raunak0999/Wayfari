@@ -70,6 +70,23 @@ export function AuthProvider({ children }) {
         async (event, session) => {
           if (session?.user) {
             setUser(session.user);
+            // Ensure profile exists (especially for Google Sign-In)
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('id', session.user.id)
+              .single();
+
+            if (!existingProfile) {
+              await supabase.from('profiles').insert({
+                id: session.user.id,
+                name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Traveler',
+                email: session.user.email,
+                gender: session.user.user_metadata?.gender || 'other',
+                profile_complete: false
+              });
+            }
+
             await loadProfile(session.user.id);
           } else {
             setUser(null);
@@ -135,29 +152,30 @@ export function AuthProvider({ children }) {
         }
 
         if (data.user) {
-          const { error: profileError } = await supabase.from('profiles').upsert({
-            id: data.user.id,
-            name,
-            email,
-            gender: gender.toLowerCase(),
-            profile_complete: false
-          });
+          // If session is active (email confirmation disabled in Supabase), create profile
+          if (data.session) {
+            const { error: profileError } = await supabase.from('profiles').upsert({
+              id: data.user.id,
+              name,
+              email,
+              gender: gender.toLowerCase(),
+              profile_complete: false
+            });
 
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-          }
+            if (profileError) {
+              console.error('Profile creation error:', profileError);
+            }
 
-          // If email confirmation is required (user exists but session is null)
-          if (!data.session) {
+            setUser(data.user);
+            await loadProfile(data.user.id);
+          } else {
+            // Email confirmation is required by Supabase
             return {
               success: true,
               needsConfirmation: true,
-              message: 'Account created! Please check your email and click the confirmation link to activate your account.'
+              message: 'Account created! Please check your email inbox and click the confirmation link to activate your account before logging in.'
             };
           }
-
-          setUser(data.user);
-          await loadProfile(data.user.id);
         }
 
         return { success: true };
