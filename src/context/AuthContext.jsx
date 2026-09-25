@@ -304,6 +304,7 @@ export function AuthProvider({ children }) {
       if (updates.interests.sleepSchedule) merged.sleep_schedule = updates.interests.sleepSchedule;
     }
 
+    if (updates.travelExperience) merged.travel_experience = updates.travelExperience;
     if (updates.profileComplete !== undefined) merged.profile_complete = updates.profileComplete;
 
     if (updates.safety) {
@@ -330,6 +331,7 @@ export function AuthProvider({ children }) {
       if (merged.buddy_gender) dbUpdates.buddy_gender = merged.buddy_gender;
       if (merged.noise_level) dbUpdates.noise_level = merged.noise_level;
       if (merged.sleep_schedule) dbUpdates.sleep_schedule = merged.sleep_schedule;
+      if (merged.travel_experience) dbUpdates.travel_experience = merged.travel_experience;
       if (merged.profile_complete !== undefined) dbUpdates.profile_complete = merged.profile_complete;
       if (merged.sos_enabled !== undefined) dbUpdates.sos_enabled = merged.sos_enabled;
       if (merged.checkin_interval) dbUpdates.checkin_interval = merged.checkin_interval;
@@ -377,6 +379,8 @@ export function AuthProvider({ children }) {
     name: profile.name,
     email: profile.email || user.email,
     gender: profile.gender || user.user_metadata?.gender,
+    travelExperience: profile.travel_experience || 'beginner',
+    travel_experience: profile.travel_experience || 'beginner',
     profileComplete: profile.profile_complete,
     profile: {
       avatar: profile.avatar_url,

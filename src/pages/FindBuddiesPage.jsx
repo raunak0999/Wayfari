@@ -19,6 +19,7 @@ export default function FindBuddiesPage() {
     date: '',
     groupSize: '',
     travelStyle: '',
+    experience: '',
     hobby: '',
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -133,6 +134,26 @@ export default function FindBuddiesPage() {
                       onClick={() => handleFilter('travelStyle', style)}
                     >
                       {style || 'Any'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Experience Level</label>
+                <div className="pill-group">
+                  {[
+                    { val: '', label: 'Any' },
+                    { val: 'beginner', label: '🔰 Beginners' },
+                    { val: 'intermediate', label: '🧳 Intermediate' },
+                    { val: 'expert', label: '🏔️ Experts / Mentors' }
+                  ].map(item => (
+                    <button
+                      key={item.val}
+                      className={`pill-toggle ${filters.experience === item.val ? 'pill-toggle--active' : ''}`}
+                      onClick={() => handleFilter('experience', item.val)}
+                    >
+                      {item.label}
                     </button>
                   ))}
                 </div>

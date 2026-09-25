@@ -104,6 +104,17 @@ export default function BuddyCard({ buddy, showConnect = true }) {
         <span>{buddyDest}</span>
       </div>
 
+      <div style={{ padding: '0 16px', marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="badge badge--info" style={{ fontSize: '0.75rem' }}>
+          {buddy.travel_experience === 'expert' ? '🏔️ Seasoned Expert Mentor' : buddy.travel_experience === 'beginner' ? '🔰 First-Time Traveler' : '🧳 Intermediate Traveler'}
+        </span>
+        {user?.travel_experience === 'beginner' && buddy.travel_experience === 'expert' && (
+          <span className="badge badge--success" style={{ fontSize: '0.72rem' }}>
+            🤝 Top Guide Match
+          </span>
+        )}
+      </div>
+
       <div className="buddy-card__chips">
         {buddyHobbies.slice(0, 4).map(h => (
           <span key={h} className="chip chip--active buddy-card__hobby">{h}</span>

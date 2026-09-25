@@ -27,6 +27,7 @@ export default function ProfileWizard() {
     tripDuration: '',
     groupSize: '2',
     travelStyle: 'Mid-range',
+    travelExperience: 'beginner',
   });
 
   const [interests, setInterests] = useState({
@@ -96,6 +97,7 @@ export default function ProfileWizard() {
       music: interests.music,
       travelStyle: preferences.travelStyle,
       groupSize: preferences.groupSize,
+      travelExperience: preferences.travelExperience,
       safety: isFemale ? safety : undefined,
     });
     navigate('/find-buddies');
@@ -281,6 +283,29 @@ export default function ProfileWizard() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Your Travel Experience</label>
+            <div className="pill-group">
+              {[
+                { val: 'beginner', label: '🔰 Beginner / First-timer' },
+                { val: 'intermediate', label: '🧳 Intermediate Traveler' },
+                { val: 'expert', label: '🏔️ Seasoned Expert / Mentor' }
+              ].map(item => (
+                <button
+                  key={item.val}
+                  type="button"
+                  className={`pill-toggle ${preferences.travelExperience === item.val ? 'pill-toggle--active' : ''}`}
+                  onClick={() => setPreferences(prev => ({ ...prev, travelExperience: item.val }))}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <small style={{ color: 'var(--text-secondary)', display: 'block', marginTop: '6px' }}>
+              💡 We automatically pair less experienced travelers with seasoned mentors to guide them!
+            </small>
           </div>
         </div>
       )}

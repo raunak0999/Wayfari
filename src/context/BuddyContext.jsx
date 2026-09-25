@@ -24,11 +24,12 @@ const SEED_BUDDIES = [
   {
     id: 'seed_0',
     name: 'Aanya Sharma', age: 26, gender: 'female', city: 'Mumbai',
-    destination: 'Bali, Indonesia', bio: 'Yoga instructor who loves exploring hidden temples and local cuisine.',
+    destination: 'Bali, Indonesia', bio: 'Yoga instructor who loves exploring hidden temples and local cuisine. Happy to guide new travelers!',
     hobbies: ['Yoga', 'Foodie', 'Culture', 'Photography'],
     music: ['Jazz', 'World Music', 'Folk'],
     travel_style: 'Mid-range', group_size: '2', noise_level: 'Moderate', sleep_schedule: 'Early Bird',
-    departure_date: '2026-06-15', trip_duration: '10 days', profile_complete: true
+    departure_date: '2026-06-15', trip_duration: '10 days', profile_complete: true,
+    travel_experience: 'expert'
   },
   {
     id: 'seed_1',
@@ -37,25 +38,28 @@ const SEED_BUDDIES = [
     hobbies: ['Photography', 'Gaming', 'Foodie', 'Culture'],
     music: ['Hip-Hop', 'EDM', 'Pop'],
     travel_style: 'Mid-range', group_size: '2', noise_level: 'Moderate', sleep_schedule: 'Night Owl',
-    departure_date: '2026-07-01', trip_duration: '14 days', profile_complete: true
+    departure_date: '2026-07-01', trip_duration: '14 days', profile_complete: true,
+    travel_experience: 'intermediate'
   },
   {
     id: 'seed_2',
     name: 'Priya Patel', age: 24, gender: 'female', city: 'London',
-    destination: 'Santorini, Greece', bio: "Adventure seeker and sunset chaser. Let's find the best beaches together! 🌊",
+    destination: 'Santorini, Greece', bio: "First time solo traveler! Looking for an experienced buddy to show me the best spots. 🌊",
     hobbies: ['Beach', 'Photography', 'Nightlife', 'Cycling'],
     music: ['Pop', 'EDM', 'Rock'],
     travel_style: 'Luxury', group_size: '3', noise_level: 'Lively', sleep_schedule: 'Night Owl',
-    departure_date: '2026-06-20', trip_duration: '7 days', profile_complete: true
+    departure_date: '2026-06-20', trip_duration: '7 days', profile_complete: true,
+    travel_experience: 'beginner'
   },
   {
     id: 'seed_3',
     name: 'Jake Morrison', age: 31, gender: 'male', city: 'Sydney',
-    destination: 'Patagonia, Argentina', bio: 'Hiking enthusiast and mountain lover. Looking for trekking partners for an epic adventure.',
+    destination: 'Patagonia, Argentina', bio: 'Hiking enthusiast and mountain lover. 40+ countries visited, glad to mentor fellow hikers!',
     hobbies: ['Hiking', 'Photography', 'Cycling', 'Reading'],
     music: ['Rock', 'Folk', 'Classical'],
     travel_style: 'Budget', group_size: 'Solo', noise_level: 'Quiet', sleep_schedule: 'Early Bird',
-    departure_date: '2026-08-10', trip_duration: '21 days', profile_complete: true
+    departure_date: '2026-08-10', trip_duration: '21 days', profile_complete: true,
+    travel_experience: 'expert'
   },
   {
     id: 'seed_4',
@@ -64,25 +68,28 @@ const SEED_BUDDIES = [
     hobbies: ['Foodie', 'Culture', 'Yoga', 'Reading'],
     music: ['World Music', 'Jazz', 'Folk'],
     travel_style: 'Budget', group_size: '4', noise_level: 'Moderate', sleep_schedule: 'Flexible',
-    departure_date: '2026-07-15', trip_duration: '12 days', profile_complete: true
+    departure_date: '2026-07-15', trip_duration: '12 days', profile_complete: true,
+    travel_experience: 'intermediate'
   },
   {
     id: 'seed_5',
     name: 'Ryan Kim', age: 25, gender: 'male', city: 'Seoul',
-    destination: 'Bangkok, Thailand', bio: 'K-food blogger exploring street food scenes around the world. Always hungry! 🍜',
+    destination: 'Bangkok, Thailand', bio: 'First time visiting Thailand! Looking for a seasoned buddy to explore street food scenes. 🍜',
     hobbies: ['Foodie', 'Photography', 'Nightlife', 'Gaming'],
     music: ['Pop', 'Hip-Hop', 'EDM'],
     travel_style: 'Budget', group_size: '3', noise_level: 'Lively', sleep_schedule: 'Night Owl',
-    departure_date: '2026-06-25', trip_duration: '10 days', profile_complete: true
+    departure_date: '2026-06-25', trip_duration: '10 days', profile_complete: true,
+    travel_experience: 'beginner'
   },
   {
     id: 'seed_6',
     name: 'Emma Wilson', age: 28, gender: 'female', city: 'Toronto',
-    destination: 'Iceland', bio: 'Northern lights chaser and nature photographer. Looking for road trip buddies!',
+    destination: 'Iceland', bio: 'Northern lights chaser & road trip veteran! Happy to buddy up with first-timers.',
     hobbies: ['Photography', 'Hiking', 'Reading', 'Yoga'],
     music: ['Classical', 'Folk', 'Jazz'],
     travel_style: 'Mid-range', group_size: '2', noise_level: 'Quiet', sleep_schedule: 'Early Bird',
-    departure_date: '2026-09-01', trip_duration: '8 days', profile_complete: true
+    departure_date: '2026-09-01', trip_duration: '8 days', profile_complete: true,
+    travel_experience: 'expert'
   },
   {
     id: 'seed_7',
@@ -91,16 +98,18 @@ const SEED_BUDDIES = [
     hobbies: ['Beach', 'Nightlife', 'Cycling', 'Foodie'],
     music: ['EDM', 'Hip-Hop', 'World Music'],
     travel_style: 'Mid-range', group_size: '4+', noise_level: 'Lively', sleep_schedule: 'Night Owl',
-    departure_date: '2026-07-20', trip_duration: '14 days', profile_complete: true
+    departure_date: '2026-07-20', trip_duration: '14 days', profile_complete: true,
+    travel_experience: 'intermediate'
   },
   {
     id: 'seed_8',
     name: 'Lily Zhang', age: 23, gender: 'female', city: 'Shanghai',
-    destination: 'Paris, France', bio: 'Art student with a passion for museums and cafés. Bonjour, travel buddy! 🎨',
+    destination: 'Paris, France', bio: 'Art student visiting Europe for the very first time! 🎨',
     hobbies: ['Culture', 'Photography', 'Reading', 'Foodie'],
     music: ['Classical', 'Jazz', 'Pop'],
     travel_style: 'Mid-range', group_size: '2', noise_level: 'Moderate', sleep_schedule: 'Flexible',
-    departure_date: '2026-08-05', trip_duration: '10 days', profile_complete: true
+    departure_date: '2026-08-05', trip_duration: '10 days', profile_complete: true,
+    travel_experience: 'beginner'
   }
 ];
 
@@ -172,80 +181,72 @@ export function BuddyProvider({ children }) {
     const userStyle = userProfile?.travelStyle || userProfile?.travel_style || userProfile?.preferences?.travelStyle;
     const userSize = userProfile?.groupSize || userProfile?.group_size || userProfile?.preferences?.groupSize;
     const userDest = userProfile?.destination || userProfile?.preferences?.destination || '';
-    const userNoise = userProfile?.noiseLevel || userProfile?.noise_level || userProfile?.interests?.noiseLevel;
-    const userSleep = userProfile?.sleepSchedule || userProfile?.sleep_schedule || userProfile?.interests?.sleepSchedule;
+    const userExp = userProfile?.travelExperience || userProfile?.travel_experience || 'beginner';
 
     const buddyHobbies = buddy.hobbies || [];
     const buddyMusic = buddy.music || [];
     const buddyStyle = buddy.travel_style || buddy.travelStyle;
     const buddySize = buddy.group_size || buddy.groupSize;
     const buddyDest = buddy.destination || '';
-    const buddyNoise = buddy.noise_level || buddy.noiseLevel;
-    const buddySleep = buddy.sleep_schedule || buddy.sleepSchedule;
-
-    if (!userHobbies.length && !userMusic.length && !userStyle) {
-      return Math.floor(Math.random() * 30) + 60;
-    }
+    const buddyExp = buddy.travel_experience || buddy.travelExperience || 'intermediate';
 
     let score = 0;
     let total = 0;
 
-    // Hobbies overlap (30%)
-    if (userHobbies.length && buddyHobbies.length) {
-      const overlap = userHobbies.filter(h => buddyHobbies.includes(h)).length;
-      const maxH = Math.max(userHobbies.length, buddyHobbies.length, 1);
-      score += (overlap / maxH) * 30;
-      total += 30;
+    // 1. Experience Mentorship Match (25 points)
+    // Concept: Pair less experienced (beginner) with more experienced (expert/intermediate)
+    if (userExp && buddyExp) {
+      total += 25;
+      if (userExp === 'beginner') {
+        if (buddyExp === 'expert') score += 25; // Perfect mentor match!
+        else if (buddyExp === 'intermediate') score += 20;
+        else score += 10; // Both beginners
+      } else if (userExp === 'expert') {
+        if (buddyExp === 'beginner') score += 25; // Great opportunity to mentor
+        else score += 15;
+      } else { // intermediate
+        if (buddyExp === 'expert') score += 22;
+        else if (buddyExp === 'beginner') score += 20;
+        else score += 15;
+      }
     }
 
-    // Music overlap (20%)
-    if (userMusic.length && buddyMusic.length) {
-      const overlap = userMusic.filter(m => buddyMusic.includes(m)).length;
-      const maxM = Math.max(userMusic.length, buddyMusic.length, 1);
-      score += (overlap / maxM) * 20;
-      total += 20;
-    }
-
-    // Travel style (15%)
-    if (userStyle) {
-      score += (userStyle === buddyStyle ? 15 : 3);
-      total += 15;
-    }
-
-    // Group size (10%)
-    if (userSize) {
-      score += (userSize === buddySize ? 10 : 3);
-      total += 10;
-    }
-
-    // Destination match (15%)
+    // 2. Destination match (25 points)
     if (userDest && buddyDest) {
+      total += 25;
       const uLower = userDest.toLowerCase();
       const bLower = buddyDest.toLowerCase();
       if (uLower === bLower) {
-        score += 15;
+        score += 25;
       } else if (bLower.includes(uLower) || uLower.includes(bLower)) {
-        score += 10;
+        score += 18;
       } else {
-        score += 2;
+        score += 3;
       }
+    }
+
+    // 3. Travel Style / Budget (15 points)
+    if (userStyle) {
       total += 15;
+      score += (userStyle === buddyStyle ? 15 : 4);
     }
 
-    // Noise level (5%)
-    if (userNoise) {
-      score += (userNoise === buddyNoise ? 5 : 1);
-      total += 5;
+    // 4. Hobbies overlap (20 points)
+    if (userHobbies.length && buddyHobbies.length) {
+      total += 20;
+      const overlap = userHobbies.filter(h => buddyHobbies.includes(h)).length;
+      const maxH = Math.max(userHobbies.length, buddyHobbies.length, 1);
+      score += (overlap / maxH) * 20;
     }
 
-    // Sleep schedule (5%)
-    if (userSleep) {
-      score += (userSleep === buddySleep ? 5 : 1);
-      total += 5;
+    // 5. Group size (15 points)
+    if (userSize) {
+      total += 15;
+      score += (userSize === buddySize ? 15 : 4);
     }
 
-    const pct = total > 0 ? Math.round((score / total) * 100) : 70;
-    return Math.max(40, Math.min(99, pct));
+    const pct = total > 0 ? Math.round((score / total) * 100) : 75;
+    return Math.max(45, Math.min(99, pct));
   }, []);
 
   // ── Detailed Breakdown ──
@@ -407,6 +408,9 @@ export function BuddyProvider({ children }) {
     }
     if (filters.hobby) {
       results = results.filter(b => (b.hobbies || []).includes(filters.hobby));
+    }
+    if (filters.experience) {
+      results = results.filter(b => (b.travel_experience || b.travelExperience) === filters.experience);
     }
 
     return results;
