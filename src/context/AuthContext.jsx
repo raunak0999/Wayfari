@@ -116,14 +116,36 @@ export function AuthProvider({ children }) {
       if (profiles[userId]) setProfile(profiles[userId]);
       return;
     }
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (data) {
-      setProfile(data);
+      if (data && !error) {
+        setProfile(data);
+      } else {
+        // Fallback minimal profile if single row fails or RLS restricts
+        setProfile(prev => prev || {
+          id: userId,
+          name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Traveler',
+          email: user?.email,
+          profile_complete: false,
+          hobbies: [],
+          music: []
+        });
+      }
+    } catch (err) {
+      console.warn('Profile load exception, using fallback:', err);
+      setProfile(prev => prev || {
+        id: userId,
+        name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Traveler',
+        email: user?.email,
+        profile_complete: false,
+        hobbies: [],
+        music: []
+      });
     }
   };
 

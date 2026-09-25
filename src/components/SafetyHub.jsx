@@ -135,6 +135,14 @@ export default function SafetyHub() {
     showToast('✅ Check-in recorded! Your contacts are notified.');
   };
 
+  // Helper to format clean phone number for WhatsApp wa.me links
+  const getWhatsAppLink = (phone, customMsg = '') => {
+    if (!phone) return '#';
+    const cleanPhone = phone.replace(/[^\d+]/g, '');
+    const encoded = encodeURIComponent(customMsg || `🚨 EMERGENCY SOS ALERT from Wayfari!\nI need immediate assistance.\nMy current location: ${coords ? `https://www.google.com/maps?q=${coords.lat},${coords.lng}` : 'Location unavailable'}`);
+    return `https://wa.me/${cleanPhone.replace('+', '')}?text=${encoded}`;
+  };
+
   // ── SOS Long Press ──
   const handleSOSStart = useCallback(() => {
     let progress = 0;
@@ -154,7 +162,14 @@ export default function SafetyHub() {
         };
         setSosLog(prev => [sosEntry, ...prev]);
 
-        showToast(`🆘 SOS SENT to ${safetyContacts.length} contact${safetyContacts.length !== 1 ? 's' : ''}!`);
+        // Auto-trigger WhatsApp for the primary contact if phone is present
+        const primaryWithPhone = safetyContacts.find(c => c.phone);
+        if (primaryWithPhone) {
+          const waUrl = getWhatsAppLink(primaryWithPhone.phone);
+          window.open(waUrl, '_blank');
+        }
+
+        showToast(`🆘 SOS SENT! WhatsApp alert generated for ${safetyContacts.length} contact${safetyContacts.length !== 1 ? 's' : ''}!`);
 
         setTimeout(() => setSosTriggered(false), 5000);
       }
@@ -364,11 +379,11 @@ export default function SafetyHub() {
                   <div className="safety-hub__contact-actions">
                     {contact.phone && (
                       <>
+                        <a href={getWhatsAppLink(contact.phone)} target="_blank" rel="noopener noreferrer" className="btn btn--icon btn--sm safety-hub__wa-btn" title="Send WhatsApp Emergency Location">
+                          💬 WhatsApp
+                        </a>
                         <a href={`tel:${contact.phone}`} className="btn btn--icon btn--sm safety-hub__call-btn" title="Call">
                           📞
-                        </a>
-                        <a href={`sms:${contact.phone}`} className="btn btn--icon btn--sm safety-hub__text-btn" title="Text">
-                          💬
                         </a>
                       </>
                     )}

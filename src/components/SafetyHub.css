@@ -414,6 +414,27 @@
   text-decoration: none;
 }
 
+.safety-hub__wa-btn {
+  background: #25D366;
+  color: white !important;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+  transition: all 0.2s ease;
+}
+
+.safety-hub__wa-btn:hover {
+  background: #1EBE57;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 211, 102, 0.4);
+}
+
 .safety-hub__remove-btn {
   color: var(--text-muted);
   transition: var(--transition-fast);
