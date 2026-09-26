@@ -315,15 +315,14 @@ export function AuthProvider({ children }) {
   };
 
   // ── Logout ──
-  const logout = async () => {
+  const logout = () => {
+    // Fire-and-forget signOut — don't await it so logout is never blocked
     if (useSupabase) {
-      try {
-        await supabase.auth.signOut();
-      } catch (err) {
-        console.warn('Supabase signOut error / network blocked:', err);
-      }
+      supabase.auth.signOut().catch(err => {
+        console.warn('Supabase signOut error:', err);
+      });
     }
-    // Clear all Wayfari-related storage
+    // Clear all Wayfari-related storage immediately
     setStoredAuth(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(PROFILES_KEY);
