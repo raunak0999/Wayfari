@@ -22,8 +22,8 @@ const getStoredMessages = () => {
 };
 
 export function ChatProvider({ children }) {
-  const [conversations, setConversations] = useState([]);
-  const [messages, setMessages] = useState({});
+  const [conversations, setConversations] = useState(getStoredConvos);
+  const [messages, setMessages] = useState(getStoredMessages);
   const [typingUsers, setTypingUsers] = useState({});
   const [activeConvoId, setActiveConvoId] = useState(null);
   const activeConvoIdRef = useRef(null);
@@ -45,95 +45,114 @@ export function ChatProvider({ children }) {
 
   // ── Load on init ──
   const loadConversations = useCallback(async () => {
+    let dbConvos = [];
     if (useSupabase) {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .order('last_message_time', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('*')
+          .order('last_message_time', { ascending: false });
 
-      if (data && !error) {
-        const mapped = data.map(c => ({
-          ...c,
-          buddyName: c.buddy_name || c.buddyName || 'Buddy',
-          buddyAvatar: c.buddy_avatar || c.buddyAvatar || null,
-          lastMessage: c.last_message || '',
-          lastMessageTime: c.last_message_time,
-          unreadCount: c.unread_count || 0,
-          participants: [c.participant_1, c.participant_2],
-        }));
-        setConversations(mapped);
-        return;
+        if (data && !error) {
+          dbConvos = data.map(c => ({
+            ...c,
+            buddyName: c.buddy_name || c.buddyName || 'Buddy',
+            buddyAvatar: c.buddy_avatar || c.buddyAvatar || null,
+            lastMessage: c.last_message || '',
+            lastMessageTime: c.last_message_time,
+            unreadCount: c.unread_count || 0,
+            participants: [c.participant_1, c.participant_2],
+          }));
+        }
+      } catch (err) {
+        console.warn('Supabase loadConversations error:', err);
       }
     }
-    // Local fallback
-    setConversations(getStoredConvos());
-  }, [useSupabase]);
+    const localConvos = getStoredConvos();
+    const dbIds = new Set(dbConvos.map(c => c.id));
+    const extraLocal = localConvos.filter(c => !dbIds.has(c.id));
+    const merged = [...dbConvos, ...extraLocal];
+    setConversations(merged);
+    saveConvos(merged);
+  }, [useSupabase, saveConvos]);
 
   const loadMessages = useCallback(async (convoId) => {
     if (useSupabase) {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', convoId)
-        .order('created_at', { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', convoId)
+          .order('created_at', { ascending: true });
 
-      if (data && !error) {
-        const mapped = data.map(m => ({
-          ...m,
-          senderId: m.sender_id,
-          timestamp: m.created_at,
-        }));
-        setMessages(prev => ({ ...prev, [convoId]: mapped }));
-        return;
+        if (data && !error && data.length > 0) {
+          const mapped = data.map(m => ({
+            ...m,
+            senderId: m.sender_id,
+            timestamp: m.created_at,
+          }));
+          setMessages(prev => {
+            const updated = { ...prev, [convoId]: mapped };
+            saveMsgs(updated);
+            return updated;
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase loadMessages error:', err);
       }
     }
-    // Local — already in state from init
-  }, [useSupabase]);
+  }, [useSupabase, saveMsgs]);
 
   useEffect(() => {
     loadConversations();
-    // Load stored messages locally
-    if (!useSupabase) {
-      setMessages(getStoredMessages());
-    }
+    setMessages(getStoredMessages());
 
     if (useSupabase) {
-      const msgSub = supabase
-        .channel('messages-realtime')
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        }, (payload) => {
-          const newMsg = {
-            ...payload.new,
-            senderId: payload.new.sender_id,
-            timestamp: payload.new.created_at,
-          };
-          setMessages(prev => ({
-            ...prev,
-            [newMsg.conversation_id]: [...(prev[newMsg.conversation_id] || []), newMsg]
-          }));
-          loadConversations();
-        })
-        .subscribe();
+      try {
+        const msgSub = supabase
+          .channel('messages-realtime')
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages'
+          }, (payload) => {
+            const newMsg = {
+              ...payload.new,
+              senderId: payload.new.sender_id,
+              timestamp: payload.new.created_at,
+            };
+            setMessages(prev => {
+              const updated = {
+                ...prev,
+                [newMsg.conversation_id]: [...(prev[newMsg.conversation_id] || []), newMsg]
+              };
+              saveMsgs(updated);
+              return updated;
+            });
+            loadConversations();
+          })
+          .subscribe();
 
-      return () => { supabase.removeChannel(msgSub); };
+        return () => { supabase.removeChannel(msgSub); };
+      } catch (err) {
+        console.warn('Realtime message channel error:', err);
+      }
     }
-  }, [loadConversations, useSupabase]);
+  }, [loadConversations, useSupabase, saveMsgs]);
 
   // ── Save when state changes ──
   useEffect(() => {
-    if (!useSupabase && conversations.length > 0) {
+    if (conversations.length > 0) {
       saveConvos(conversations);
     }
-  }, [conversations, useSupabase, saveConvos]);
+  }, [conversations, saveConvos]);
 
   useEffect(() => {
-    if (!useSupabase && Object.keys(messages).length > 0) {
+    if (Object.keys(messages).length > 0) {
       saveMsgs(messages);
     }
-  }, [messages, useSupabase, saveMsgs]);
+  }, [messages, saveMsgs]);
 
   // ── Get or Create Conversation ──
   const getOrCreateConversation = useCallback(async (userId, buddyId, buddyName, buddyAvatar) => {

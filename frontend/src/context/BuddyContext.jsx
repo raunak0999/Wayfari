@@ -114,7 +114,7 @@ const SEED_BUDDIES = [
 ];
 
 export function BuddyProvider({ children }) {
-  const [buddies, setBuddies] = useState([]);
+  const [buddies, setBuddies] = useState(SEED_BUDDIES);
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const useSupabase = isSupabaseConfigured();
