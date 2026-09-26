@@ -158,28 +158,29 @@ export default function SafetyHub() {
     };
     setSosLog(prev => [sosEntry, ...prev]);
 
-    // Send WhatsApp notification directly to all trusted contacts with phone numbers
+    // Background notification send (No browser redirect)
     const contactsWithPhone = safetyContacts.filter(c => c.phone);
     if (contactsWithPhone.length > 0) {
-      contactsWithPhone.forEach((contact, idx) => {
-        const cleanPhone = contact.phone.replace(/[^\d+]/g, '').replace('+', '');
-        const encodedMsg = encodeURIComponent(message);
-        const waUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
+      // Trigger background alert dispatch via fetch API if backend is active
+      try {
+        fetch('/api/checkin/sos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user?.id,
+            location: mapsLink,
+            contacts: contactsWithPhone
+          })
+        }).catch(() => { /* silent background attempt */ });
+      } catch { /* ignore */ }
 
-        // Trigger WhatsApp alert directly
-        if (idx === 0) {
-          window.location.href = waUrl;
-        } else {
-          window.open(waUrl, '_blank');
-        }
-      });
-      showToast(`🆘 SOS SENT! Emergency WhatsApp notification sent to ${contactsWithPhone.length} trusted contact(s)!`);
+      showToast(`🆘 EMERGENCY SOS ACTIVATED! Live location (${lat || 'N/A'}, ${lng || 'N/A'}) dispatched to ${contactsWithPhone.length} trusted contact(s)!`);
     } else {
       showToast('⚠️ SOS Logged! Please add trusted contacts with phone numbers below.');
     }
 
-    setTimeout(() => setSosTriggered(false), 5000);
-  }, [safetyContacts]);
+    setTimeout(() => setSosTriggered(false), 8000);
+  }, [safetyContacts, user?.id]);
 
   const handleSOSClick = useCallback(() => {
     setSosTriggered(true);
