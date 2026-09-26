@@ -2,7 +2,7 @@ services:
   - type: web
     name: wayfari
     runtime: static
-    buildCommand: npm run build:frontend
+    buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     routes:
       - type: rewrite
