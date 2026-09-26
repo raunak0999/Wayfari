@@ -638,18 +638,28 @@ textarea.form-input { resize: vertical; min-height: 100px; }
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
-  .grid--3 { grid-template-columns: repeat(2, 1fr); }
-  .grid--4 { grid-template-columns: repeat(2, 1fr); }
+  .grid--3 { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .grid--4 { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .container { padding: 0 20px; }
 }
 
 @media (max-width: 768px) {
-  .grid--2, .grid--3, .grid--4 { grid-template-columns: 1fr; }
-  .section { padding: 56px 0; }
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  .grid--2, .grid--3, .grid--4 { grid-template-columns: 1fr; gap: 16px; }
+  .section { padding: 48px 0; }
   .container { padding: 0 16px; }
   .btn--lg { padding: 14px 28px; font-size: 1rem; }
+  .pill-group { gap: 6px; }
+  .pill-toggle { padding: 8px 16px; font-size: 0.82rem; }
 }
 
 @media (max-width: 480px) {
-  h1 { font-size: 1.75rem; }
-  h2 { font-size: 1.5rem; }
+  h1 { font-size: 1.85rem; line-height: 1.15; }
+  h2 { font-size: 1.45rem; }
+  .container { padding: 0 12px; }
+  .btn--sm { padding: 8px 14px; font-size: 0.8rem; }
+  .card { padding: 20px 16px; }
 }
