@@ -12,14 +12,14 @@ export default function ChatPage() {
   const { getAcceptedConnections } = useBuddies();
   const { getOrCreateConversation } = useChat();
   const [activeConvo, setActiveConvo] = useState(null);
+  // On mobile (<=768px), start on sidebar. On desktop, start without sidebar restriction
   const [showSidebar, setShowSidebar] = useState(true);
 
-  // Get accepted connections for quick-start
   const accepted = getAcceptedConnections(user?.id);
 
-  // Auto-select first conversation on desktop/tablet if none selected
+  // Auto-select first conversation on desktop if none selected
   useEffect(() => {
-    const isMobile = window.innerWidth <= 992;
+    const isMobile = window.innerWidth <= 768;
     if (!activeConvo && conversations.length > 0 && !isMobile) {
       const first = conversations[0];
       setActiveConvo(first);
@@ -44,7 +44,10 @@ export default function ChatPage() {
     loadMessages(convo.id);
   };
 
-  // Check if there are buddies without conversations yet
+  const handleBack = () => {
+    setShowSidebar(true);
+  };
+
   const buddiesWithoutConvo = accepted.filter(buddy => {
     return !conversations.find(c =>
       c.participant_1 === buddy.id || c.participant_2 === buddy.id ||
@@ -55,9 +58,8 @@ export default function ChatPage() {
   return (
     <div className="chat-page" id="chat-page">
       <div className="chat-page__layout">
-        {/* Sidebar */}
+        {/* Sidebar — always visible on desktop, toggle-controlled on mobile */}
         <div className={`chat-page__sidebar ${showSidebar ? 'show' : ''}`}>
-          {/* Connected buddies quick-start */}
           {buddiesWithoutConvo.length > 0 && (
             <div className="chat-page__quick-start">
               <h4>Start chatting with your matches:</h4>
@@ -81,9 +83,9 @@ export default function ChatPage() {
           />
         </div>
 
-        {/* Chat Area */}
+        {/* Chat Area — always visible on desktop, toggle-controlled on mobile */}
         <div className={`chat-page__main ${!showSidebar ? 'show' : ''}`}>
-          <ChatWindow conversation={activeConvo} onBack={() => setShowSidebar(true)} />
+          <ChatWindow conversation={activeConvo} onBack={handleBack} />
         </div>
       </div>
 
