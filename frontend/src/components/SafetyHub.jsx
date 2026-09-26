@@ -143,47 +143,65 @@ export default function SafetyHub() {
     return `https://wa.me/${cleanPhone.replace('+', '')}?text=${encoded}`;
   };
 
-  // ── SOS Long Press ──
-  const handleSOSStart = useCallback(() => {
-    let progress = 0;
-    const timer = setInterval(() => {
-      progress += 2;
-      setSosProgress(progress);
-      if (progress >= 100) {
-        clearInterval(timer);
-        setSosTriggered(true);
+  // ── SOS Instant 1-Click Trigger ──
+  const dispatchSOS = useCallback((lat, lng) => {
+    const mapsLink = lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : 'Location unavailable';
+    const message = `🚨 EMERGENCY SOS ALERT from Wayfari!\nI need immediate assistance!\nMy current live location: ${mapsLink}`;
 
-        // Log the SOS
-        const sosEntry = {
-          id: Date.now(),
-          time: new Date().toISOString(),
-          location: coords ? `${coords.lat}, ${coords.lng}` : 'Location unavailable',
-          contactsNotified: safetyContacts.map(c => c.name).filter(Boolean),
-        };
-        setSosLog(prev => [sosEntry, ...prev]);
+    // Log the SOS event
+    const sosEntry = {
+      id: Date.now(),
+      time: new Date().toISOString(),
+      location: lat && lng ? `${lat}, ${lng}` : 'Location unavailable',
+      mapsLink,
+      contactsNotified: safetyContacts.map(c => c.name || c.phone).filter(Boolean),
+    };
+    setSosLog(prev => [sosEntry, ...prev]);
 
-        // Auto-trigger WhatsApp for the primary contact if phone is present
-        const primaryWithPhone = safetyContacts.find(c => c.phone);
-        if (primaryWithPhone) {
-          const waUrl = getWhatsAppLink(primaryWithPhone.phone);
+    // Send WhatsApp notification directly to all trusted contacts with phone numbers
+    const contactsWithPhone = safetyContacts.filter(c => c.phone);
+    if (contactsWithPhone.length > 0) {
+      contactsWithPhone.forEach((contact, idx) => {
+        const cleanPhone = contact.phone.replace(/[^\d+]/g, '').replace('+', '');
+        const encodedMsg = encodeURIComponent(message);
+        const waUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
+
+        // Trigger WhatsApp alert directly
+        if (idx === 0) {
+          window.location.href = waUrl;
+        } else {
           window.open(waUrl, '_blank');
         }
-
-        showToast(`🆘 SOS SENT! WhatsApp alert generated for ${safetyContacts.length} contact${safetyContacts.length !== 1 ? 's' : ''}!`);
-
-        setTimeout(() => setSosTriggered(false), 5000);
-      }
-    }, 30);
-    setSosTimer(timer);
-  }, [coords, safetyContacts]);
-
-  const handleSOSEnd = useCallback(() => {
-    if (sosTimer) {
-      clearInterval(sosTimer);
-      setSosTimer(null);
-      setSosProgress(0);
+      });
+      showToast(`🆘 SOS SENT! Emergency WhatsApp notification sent to ${contactsWithPhone.length} trusted contact(s)!`);
+    } else {
+      showToast('⚠️ SOS Logged! Please add trusted contacts with phone numbers below.');
     }
-  }, [sosTimer]);
+
+    setTimeout(() => setSosTriggered(false), 5000);
+  }, [safetyContacts]);
+
+  const handleSOSClick = useCallback(() => {
+    setSosTriggered(true);
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const currentLat = pos.coords.latitude.toFixed(6);
+          const currentLng = pos.coords.longitude.toFixed(6);
+          setCoords({ lat: currentLat, lng: currentLng });
+          dispatchSOS(currentLat, currentLng);
+        },
+        (err) => {
+          console.warn('Geolocation error during SOS:', err);
+          dispatchSOS(coords?.lat, coords?.lng);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      dispatchSOS(coords?.lat, coords?.lng);
+    }
+  }, [coords, dispatchSOS]);
 
   // ── Contacts CRUD ──
   const addContact = () => {
@@ -292,30 +310,16 @@ export default function SafetyHub() {
         {/* SOS Button */}
         <div className="safety-hub__card card safety-hub__sos-card">
           <h3>🆘 Emergency SOS</h3>
-          <p>Long-press the button to silently alert all your trusted contacts with your current location.</p>
+          <p>Click the button to instantly alert all your trusted contacts with your live location.</p>
           <div className="safety-hub__sos-container">
             <button
               className={`safety-hub__sos-btn ${sosTriggered ? 'triggered' : ''}`}
-              onMouseDown={handleSOSStart}
-              onMouseUp={handleSOSEnd}
-              onMouseLeave={handleSOSEnd}
-              onTouchStart={handleSOSStart}
-              onTouchEnd={handleSOSEnd}
+              onClick={handleSOSClick}
               id="sos-button"
             >
               {sosTriggered ? '✓ SENT' : 'SOS'}
-              <svg className="safety-hub__sos-ring" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="46" stroke="rgba(255,255,255,0.3)" strokeWidth="4" fill="none" />
-                <circle
-                  cx="50" cy="50" r="46"
-                  stroke="white" strokeWidth="4" fill="none"
-                  strokeDasharray={`${sosProgress * 2.89} 289`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 50 50)"
-                />
-              </svg>
             </button>
-            <small>Hold for 1.5 seconds to send</small>
+            <small>Click to send instant Emergency SOS with live location</small>
           </div>
 
           {/* Recent SOS Log */}
