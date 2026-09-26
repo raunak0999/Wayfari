@@ -131,7 +131,10 @@ export function BuddyProvider({ children }) {
         if (error || !data || data.length === 0) {
           setBuddies(SEED_BUDDIES);
         } else {
-          setBuddies(data);
+          // Merge Supabase profiles with SEED_BUDDIES so dummy travelers are always available
+          const supabaseIds = new Set(data.map(p => p.id));
+          const extraSeed = SEED_BUDDIES.filter(b => !supabaseIds.has(b.id));
+          setBuddies([...data, ...extraSeed]);
         }
       } catch (err) {
         console.warn('Supabase loadBuddies error / blocked by browser:', err);

@@ -317,7 +317,11 @@ export function AuthProvider({ children }) {
   // ── Logout ──
   const logout = async () => {
     if (useSupabase) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('Supabase signOut error / network blocked:', err);
+      }
     }
     setStoredAuth(null);
     setUser(null);
