@@ -76,7 +76,7 @@ export default function HeroSection() {
       <div className="hero__orb hero__orb--3" ref={orb3} />
       <div className="hero__grid-overlay" />
 
-      <div className="hero__inner">
+      <div className="hero__inner container">
         {/* ── Left Content ── */}
         <div className="hero__content">
           <span className="hero__badge">
@@ -116,24 +116,55 @@ export default function HeroSection() {
           </div>
         </div>
 
-        {/* ── Right Visual ── */}
+        {/* ── Right Visual (Wayfari Travel Buddy Showcase) ── */}
         <div className="hero__visual">
           <div className="hero__3d-wrapper">
-            <div className="hero__image-card">
-              <img src="/hero-travel.png" alt="Travelers exploring" />
+            <div className="hero__showcase-card">
+              <div className="hero__showcase-header">
+                <span className="hero__showcase-match">🔥 98% Match</span>
+                <span className="hero__showcase-verified">🛡️ Verified Buddy</span>
+              </div>
+              
+              <div className="hero__showcase-profile">
+                <div className="hero__showcase-avatar">
+                  <span>A</span>
+                </div>
+                <div className="hero__showcase-details">
+                  <h3 className="hero__showcase-name">Aanya Sharma</h3>
+                  <p className="hero__showcase-sub">26 · Mumbai, India</p>
+                </div>
+              </div>
+
+              <div className="hero__showcase-dest">
+                <span className="hero__showcase-dest-icon">📍</span>
+                <div>
+                  <small>Next Destination:</small>
+                  <strong>Bali, Indonesia 🌴</strong>
+                </div>
+              </div>
+
+              <div className="hero__showcase-chips">
+                <span className="chip chip--active">Yoga</span>
+                <span className="chip chip--active">Photography</span>
+                <span className="chip chip--active">Backpacking</span>
+              </div>
+
+              <Link to="/auth" className="btn btn--sm btn--primary hero__showcase-btn">
+                🤝 Connect on Wayfari
+              </Link>
             </div>
 
             <div className="hero__floating-card hero__floating-card--bottom">
-              <span className="hero__floating-icon">🥾</span>
+              <span className="hero__floating-icon">💬</span>
               <div>
-                <strong>Hiking Trip</strong>
-                <span>Manali, India · 3 days</span>
+                <strong>Live Chat Active</strong>
+                <span>"Hey! Ready to explore Bali together?"</span>
               </div>
             </div>
 
             <div className="hero__floating-card hero__floating-card--top">
               <span className="hero__match-badge">98%</span>
-              <span>Match</span>
+              <span>Compatibility</span>
             </div>
 
             <div className="hero__orbit-ring">
