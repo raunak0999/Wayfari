@@ -17,9 +17,10 @@ export default function ChatPage() {
   // Get accepted connections for quick-start
   const accepted = getAcceptedConnections(user?.id);
 
-  // Auto-select first conversation if none selected
+  // Auto-select first conversation on desktop/tablet if none selected
   useEffect(() => {
-    if (!activeConvo && conversations.length > 0) {
+    const isMobile = window.innerWidth <= 768;
+    if (!activeConvo && conversations.length > 0 && !isMobile) {
       const first = conversations[0];
       setActiveConvo(first);
       setActiveConvoId(first.id);
@@ -81,11 +82,11 @@ export default function ChatPage() {
         </div>
 
         {/* Chat Area */}
-        <div className="chat-page__main">
+        <div className={`chat-page__main ${!showSidebar ? 'show' : ''}`}>
           {/* Mobile back button */}
           {!showSidebar && (
             <button className="chat-page__back-btn" onClick={() => setShowSidebar(true)}>
-              ← Back
+              ← Back to Messages
             </button>
           )}
           <ChatWindow conversation={activeConvo} />

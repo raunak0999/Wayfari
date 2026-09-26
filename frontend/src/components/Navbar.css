@@ -206,24 +206,43 @@
   .navbar__links {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(255,255,255,0.98);
+    background: #FFFFFF;
     backdrop-filter: blur(40px);
     flex-direction: column;
     justify-content: center;
+    align-items: center;
     gap: 16px;
     padding: 80px 24px 24px;
     transform: translateX(100%);
     transition: var(--transition);
     opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 999;
   }
 
   .navbar__links.open {
     transform: translateX(0);
     opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
   }
 
-  .navbar__link { font-size: 1.2rem; padding: 14px 24px; }
+  .magnetic-element {
+    transform: none !important;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .navbar__link {
+    font-size: 1.2rem;
+    padding: 14px 24px;
+    width: 100%;
+    text-align: center;
+  }
   .navbar__link::after { display: none; }
-  .navbar__cta { margin-left: 0; font-size: 1.1rem; }
-  .navbar__user { margin-left: 0; flex-direction: column; gap: 16px; }
+  .navbar__cta { margin-left: 0; font-size: 1.1rem; width: 80%; justify-content: center; }
+  .navbar__user { margin-left: 0; flex-direction: column; gap: 16px; width: 100%; align-items: center; }
+  .navbar__logout-btn { margin-left: 0; width: 80%; justify-content: center; }
 }
