@@ -56,47 +56,80 @@ export function AuthProvider({ children }) {
 
   // ── Initialize ──
   useEffect(() => {
+    let mounted = true;
+
+    // Safety fallback timer so the app never gets stuck on "Loading Wayfari..."
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 2500);
+
     if (useSupabase) {
       // Supabase flow
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setUser(session.user);
-          loadProfile(session.user.id);
-        }
-        setLoading(false);
-      });
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          if (!mounted) return;
           if (session?.user) {
             setUser(session.user);
-            // Ensure profile exists (especially for Google Sign-In)
-            const { data: existingProfile } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('id', session.user.id)
-              .single();
-
-            if (!existingProfile) {
-              await supabase.from('profiles').insert({
-                id: session.user.id,
-                name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Traveler',
-                email: session.user.email,
-                gender: session.user.user_metadata?.gender || 'other',
-                profile_complete: false
-              });
-            }
-
-            await loadProfile(session.user.id);
-          } else {
-            setUser(null);
-            setProfile(null);
+            loadProfile(session.user.id);
           }
           setLoading(false);
-        }
-      );
+          clearTimeout(safetyTimer);
+        })
+        .catch(err => {
+          console.warn('Supabase getSession error / blocked by browser:', err);
+          if (mounted) setLoading(false);
+          clearTimeout(safetyTimer);
+        });
 
-      return () => subscription.unsubscribe();
+      let subscriptionObj = null;
+      try {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (!mounted) return;
+            if (session?.user) {
+              setUser(session.user);
+              try {
+                // Ensure profile exists (especially for Google Sign-In)
+                const { data: existingProfile } = await supabase
+                  .from('profiles')
+                  .select('id')
+                  .eq('id', session.user.id)
+                  .single();
+
+                if (!existingProfile) {
+                  await supabase.from('profiles').insert({
+                    id: session.user.id,
+                    name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Traveler',
+                    email: session.user.email,
+                    gender: session.user.user_metadata?.gender || 'other',
+                    profile_complete: false
+                  });
+                }
+
+                await loadProfile(session.user.id);
+              } catch (profileErr) {
+                console.warn('Profile creation/loading error:', profileErr);
+              }
+            } else {
+              setUser(null);
+              setProfile(null);
+            }
+            if (mounted) setLoading(false);
+            clearTimeout(safetyTimer);
+          }
+        );
+        subscriptionObj = subscription;
+      } catch (subErr) {
+        console.warn('Supabase onAuthStateChange error:', subErr);
+        if (mounted) setLoading(false);
+        clearTimeout(safetyTimer);
+      }
+
+      return () => {
+        mounted = false;
+        clearTimeout(safetyTimer);
+        if (subscriptionObj) subscriptionObj.unsubscribe();
+      };
     } else {
       // Local auth flow
       const stored = getStoredAuth();
@@ -106,6 +139,8 @@ export function AuthProvider({ children }) {
         setProfile(profiles[stored.id] || stored);
       }
       setLoading(false);
+      clearTimeout(safetyTimer);
+      return () => { mounted = false; };
     }
   }, [useSupabase]);
 

@@ -122,15 +122,20 @@ export function BuddyProvider({ children }) {
   // Load buddies
   const loadBuddies = useCallback(async () => {
     if (useSupabase) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('profile_complete', true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('profile_complete', true);
 
-      if (error || !data || data.length === 0) {
+        if (error || !data || data.length === 0) {
+          setBuddies(SEED_BUDDIES);
+        } else {
+          setBuddies(data);
+        }
+      } catch (err) {
+        console.warn('Supabase loadBuddies error / blocked by browser:', err);
         setBuddies(SEED_BUDDIES);
-      } else {
-        setBuddies(data);
       }
     } else {
       setBuddies(SEED_BUDDIES);
@@ -141,10 +146,14 @@ export function BuddyProvider({ children }) {
   // Load connections
   const loadConnections = useCallback(async () => {
     if (useSupabase) {
-      const { data } = await supabase.from('connections').select('*');
-      if (data) {
-        setConnections(data);
-        return;
+      try {
+        const { data } = await supabase.from('connections').select('*');
+        if (data) {
+          setConnections(data);
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase loadConnections error / blocked by browser:', err);
       }
     }
     // Local fallback
