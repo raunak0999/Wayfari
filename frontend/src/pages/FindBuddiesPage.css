@@ -1,5 +1,5 @@
 .find-page {
-  padding-top: 120px;
+  padding-top: 150px;
   padding-bottom: 80px;
   min-height: 100vh;
   position: relative;
@@ -11,6 +11,13 @@
 
 .find-page__header h1 {
   margin-bottom: 8px;
+}
+
+.find-page__highlight {
+  background: linear-gradient(135deg, #D97706, #B45309);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 900;
 }
 
 .find-page__header p {
@@ -146,10 +153,11 @@
 }
 
 .find-page__sort-btn.active {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white;
-  border-color: var(--primary);
-  box-shadow: 0 0 14px rgba(0,0,0,0.2);
+  background: var(--primary);
+  color: var(--dark);
+  font-weight: 700;
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-yellow);
 }
 
 /* Empty State */

@@ -71,7 +71,7 @@ export default function FindBuddiesPage() {
         {/* Header */}
         <div className="find-page__header animate-fade-in-up">
           <div>
-            <h1>Find Your <span style={{ color: 'var(--primary)' }}>Travel Buddy</span></h1>
+            <h1>Find Your <span className="find-page__highlight">Travel Buddy</span></h1>
             <p>Discover compatible travelers heading to your dream destinations.</p>
           </div>
         </div>
