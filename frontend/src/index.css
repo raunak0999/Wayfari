@@ -643,7 +643,7 @@ textarea.form-input { resize: vertical; min-height: 100px; }
   .container { padding: 0 20px; }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   html, body {
     overflow-x: hidden;
     width: 100%;

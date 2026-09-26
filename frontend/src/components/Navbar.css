@@ -184,7 +184,7 @@
 .navbar__hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
 
 /* ── Mobile/Tablet breakpoint ── */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .navbar {
     height: 56px;
   }
