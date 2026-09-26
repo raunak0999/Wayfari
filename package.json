@@ -3,18 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "description": "Wayfari Travel Buddy Application Monorepo",
-  "workspaces": [
-    "frontend",
-    "backend"
-  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=frontend\" \"npm run dev --workspace=backend\"",
-    "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:backend": "npm run dev --workspace=backend",
-    "build": "cd frontend && npm install --include=optional && npm run build",
-    "build:frontend": "cd frontend && npm install --include=optional && npm run build",
-    "build:backend": "npm run build --workspace=backend",
-    "install:all": "npm install --include=optional && npm install --prefix frontend --include=optional && npm install --prefix backend --include=optional"
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "cd frontend && npm install && npm run build",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "install:all": "npm --prefix frontend install && npm --prefix backend install"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
