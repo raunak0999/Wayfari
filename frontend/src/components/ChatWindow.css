@@ -136,6 +136,29 @@
   cursor: not-allowed;
 }
 
+/* Mobile Back Button in Header */
+.chat-window__back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  color: var(--dark);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.chat-window__back-btn:hover {
+  background: var(--dark);
+  color: #FFFFFF;
+  border-color: var(--dark);
+}
+
 @media (max-width: 768px) {
   .chat-window__header {
     padding: 10px 14px;
@@ -146,11 +169,15 @@
   }
   .chat-window__input {
     padding: 10px 14px;
-    font-size: 0.88rem;
+    font-size: 16px !important;
+    touch-action: manipulation;
   }
   .chat-window__send-btn {
     width: 38px;
     height: 38px;
+  }
+  .chat-window__messages {
+    padding: 12px;
   }
 }
 

@@ -5,7 +5,7 @@ import './ChatWindow.css';
 
 const QUICK_EMOJIS = ['😊', '😍', '🎉', '✈️', '🌍', '🗺️', '📸', '🍜', '❤️', '👍', '🔥', '😂'];
 
-export default function ChatWindow({ conversation }) {
+export default function ChatWindow({ conversation, onBack }) {
   const { user } = useAuth();
   const { getMessages, sendMessage, typingUsers, markAsRead } = useChat();
   const [text, setText] = useState('');
@@ -81,6 +81,13 @@ export default function ChatWindow({ conversation }) {
       {/* Header */}
       <div className="chat-window__header">
         <div className="chat-window__buddy">
+          {onBack && (
+            <button className="chat-window__back-btn" onClick={onBack} aria-label="Back to conversations">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+            </button>
+          )}
           <div className="chat-window__avatar">
             {conversation.buddyAvatar ? (
               <img src={conversation.buddyAvatar} alt={conversation.buddyName} />

@@ -1,7 +1,7 @@
 .chat-page {
   padding-top: 72px;
-  height: 100dvh;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
   background: var(--bg);
@@ -10,8 +10,8 @@
 .chat-page__layout {
   display: grid;
   grid-template-columns: 360px 1fr;
-  height: calc(100dvh - 72px);
   height: calc(100vh - 72px);
+  height: calc(100dvh - 72px);
 }
 
 .chat-page__sidebar {
@@ -90,8 +90,8 @@
 @media (max-width: 768px) {
   .chat-page {
     padding-top: 64px;
-    height: calc(100dvh - 64px);
     height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
   }
 
   .chat-page__layout {

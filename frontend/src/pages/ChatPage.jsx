@@ -83,13 +83,7 @@ export default function ChatPage() {
 
         {/* Chat Area */}
         <div className={`chat-page__main ${!showSidebar ? 'show' : ''}`}>
-          {/* Mobile back button */}
-          {!showSidebar && (
-            <button className="chat-page__back-btn" onClick={() => setShowSidebar(true)}>
-              ← Back to Messages
-            </button>
-          )}
-          <ChatWindow conversation={activeConvo} />
+          <ChatWindow conversation={activeConvo} onBack={() => setShowSidebar(true)} />
         </div>
       </div>
 
