@@ -11,10 +11,10 @@
     "dev": "concurrently \"npm run dev --workspace=frontend\" \"npm run dev --workspace=backend\"",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
-    "build": "cd frontend && npm install && npm run build",
-    "build:frontend": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install --include=optional && npm run build",
+    "build:frontend": "cd frontend && npm install --include=optional && npm run build",
     "build:backend": "npm run build --workspace=backend",
-    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend"
+    "install:all": "npm install --include=optional && npm install --prefix frontend --include=optional && npm install --prefix backend --include=optional"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
