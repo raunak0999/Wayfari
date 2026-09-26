@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import ParticleCanvas from './ParticleCanvas';
+import MascotBadge from './MascotBadge';
 import './HeroSection.css';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -79,6 +80,9 @@ export default function HeroSection() {
       <div className="hero__inner container">
         {/* ── Left Content ── */}
         <div className="hero__content">
+          <div style={{ marginBottom: '20px' }}>
+            <MascotBadge message="Find verified travel buddies worldwide!" />
+          </div>
           <span className="hero__badge">
             <span className="hero__badge-dot" />
             <span>🌍 Your next adventure starts here</span>

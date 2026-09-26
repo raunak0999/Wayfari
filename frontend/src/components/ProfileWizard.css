@@ -40,10 +40,10 @@
 }
 
 .wizard__step-dot.active {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white;
-  border-color: var(--primary);
-  box-shadow: 0 0 20px rgba(255, 107, 44, 0.3);
+  background: var(--primary);
+  color: var(--dark);
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-yellow);
 }
 
 .wizard__step-dot.completed {
@@ -72,7 +72,7 @@
 }
 
 .wizard__step-line.filled {
-  background: linear-gradient(90deg, var(--success), var(--neon-cyan));
+  background: var(--success);
   box-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
 }
 
@@ -95,7 +95,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 107, 44, 0.3), transparent);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .wizard__panel h2 {

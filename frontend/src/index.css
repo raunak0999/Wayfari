@@ -25,12 +25,12 @@
   --accent-emerald: #10B981;
   --accent-amber: #F59E0B;
 
-  /* ── Gradients ── */
-  --gradient-yellow: linear-gradient(135deg, #FFC82C, #F59E0B);
-  --gradient-cyan: linear-gradient(135deg, #06B6D4, #3B82F6);
-  --gradient-coral: linear-gradient(135deg, #FF6B4A, #FFAE00);
-  --gradient-emerald: linear-gradient(135deg, #10B981, #06B6D4);
-  --gradient-purple: linear-gradient(135deg, #8B5CF6, #EC4899);
+  /* ── Solid Accent Palettes (No Gradients) ── */
+  --gradient-yellow: #FFC82C;
+  --gradient-cyan: #06B6D4;
+  --gradient-coral: #FF6B4A;
+  --gradient-emerald: #10B981;
+  --gradient-purple: #8B5CF6;
 
   /* ── Light Neutrals ── */
   --bg: #FAFAFD;
@@ -113,9 +113,7 @@ body::before {
   content: '';
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background:
-    radial-gradient(ellipse 70% 50% at 15% 15%, rgba(0, 0, 0, 0.015) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 60% at 85% 80%, rgba(0, 0, 0, 0.01) 0%, transparent 70%);
+  background: var(--bg);
   pointer-events: none;
   z-index: 0;
 }
@@ -211,7 +209,7 @@ button { cursor: pointer; background: none; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
+  background: rgba(255, 255, 255, 0.08);
   opacity: 0;
   transition: var(--transition-fast);
 }
@@ -264,7 +262,7 @@ button { cursor: pointer; background: none; }
 }
 
 .btn--danger {
-  background: linear-gradient(135deg, var(--danger), #DC2626);
+  background: #EF4444;
   color: white;
   box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
 }

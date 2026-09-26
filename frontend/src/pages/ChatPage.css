@@ -73,7 +73,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--neon-purple));
+  background: #0F172A;
   color: white;
   display: flex;
   align-items: center;

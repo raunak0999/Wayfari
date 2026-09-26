@@ -52,7 +52,7 @@ export default class ErrorBoundary extends Component {
                   padding: '0.6rem 1.5rem',
                   borderRadius: '10px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #F97316, #FB923C)',
+                  background: '#F97316',
                   color: '#fff',
                   fontWeight: 600,
                   cursor: 'pointer',

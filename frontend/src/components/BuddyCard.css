@@ -17,7 +17,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.02) 100%);
+  background: rgba(255, 255, 255, 0.02);
   pointer-events: none;
   z-index: 1;
   opacity: 0;
@@ -97,11 +97,7 @@
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 2px solid transparent;
-  background: linear-gradient(135deg, var(--accent-cyan), var(--primary)) border-box;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  border: 2px solid #06B6D4;
   opacity: 0;
   transition: var(--transition);
 }

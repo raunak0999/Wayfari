@@ -15,21 +15,21 @@ const FEATURES = [
     icon: '🎯',
     title: 'Smart Matching',
     desc: 'Our algorithm finds travel buddies based on your hobbies, music taste, travel style, and schedule compatibility.',
-    gradient: 'linear-gradient(135deg, rgba(255,107,44,0.12), rgba(168,85,247,0.08))',
+    gradient: '#FFFBEB',
     glow: 'rgba(255,107,44,0.15)',
   },
   {
     icon: '🛡️',
     title: 'Safety First',
     desc: 'Built-in Safety Hub with SOS alerts, live location sharing, check-in reminders, and trusted contacts for peace of mind.',
-    gradient: 'linear-gradient(135deg, rgba(0,240,255,0.1), rgba(52,211,153,0.08))',
+    gradient: '#F0F9FF',
     glow: 'rgba(0,240,255,0.12)',
   },
   {
     icon: '💬',
     title: 'Chat & Connect',
     desc: 'Real-time messaging with your matched buddies. Plan trips, share ideas, and build friendships before you travel.',
-    gradient: 'linear-gradient(135deg, rgba(168,85,247,0.1), rgba(244,114,182,0.08))',
+    gradient: '#F3E8FF',
     glow: 'rgba(168,85,247,0.12)',
   }
 ];

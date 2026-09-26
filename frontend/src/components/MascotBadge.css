@@ -1,0 +1,63 @@
+.mascot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  padding: 8px 16px 8px 12px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  position: relative;
+  z-index: 10;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+}
+
+.mascot-badge:hover {
+  transform: translateY(-4px) scale(1.04);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
+  border-color: #FFC82C;
+}
+
+.mascot-badge__character {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mascot-svg {
+  filter: drop-shadow(0 4px 10px rgba(249, 115, 22, 0.25));
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.mascot-badge__status-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background: #10B981;
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
+}
+
+.mascot-badge__speech {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mascot-badge__text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.mascot-badge__sparkle {
+  font-size: 0.9rem;
+  animation: float 2s ease-in-out infinite;
+}

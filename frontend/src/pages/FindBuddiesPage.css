@@ -14,9 +14,7 @@
 }
 
 .find-page__highlight {
-  background: linear-gradient(135deg, #D97706, #B45309);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #D97706;
   font-weight: 900;
 }
 

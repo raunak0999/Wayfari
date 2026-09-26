@@ -84,12 +84,12 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--neon-purple));
+  background: #0F172A;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 10px rgba(255, 107, 44, 0.15);
+  box-shadow: 0 0 10px rgba(15, 23, 42, 0.15);
 }
 
 .convo-list__avatar span {
@@ -147,8 +147,8 @@
 }
 
 .convo-list__badge {
-  background: linear-gradient(135deg, var(--primary), var(--neon-purple));
-  color: white;
+  background: #FFC82C;
+  color: #0F172A;
   font-size: 0.7rem;
   font-weight: 700;
   min-width: 20px;

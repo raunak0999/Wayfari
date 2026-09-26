@@ -85,14 +85,8 @@ export default function ParticleCanvas({ className }) {
 
         // Glow
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2);
-        const glow = ctx.createRadialGradient(
-          this.x, this.y, 0,
-          this.x, this.y, this.radius * 3
-        );
-        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${this.opacity * 0.3})`);
-        glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-        ctx.fillStyle = glow;
+        ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${this.opacity * 0.15})`;
         ctx.fill();
       }
     }

@@ -27,7 +27,7 @@
   right: -20%;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.09) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.02);
   border-radius: 50%;
   animation: float 10s ease-in-out infinite;
   filter: blur(40px);
@@ -42,7 +42,7 @@
   left: -15%;
   width: 450px;
   height: 450px;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.07) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.015);
   border-radius: 50%;
   animation: float 12s ease-in-out infinite reverse;
   filter: blur(30px);
@@ -57,10 +57,6 @@
   left: 0;
   width: 50vw;
   height: 100vh;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
-  background-size: 60px 60px;
   pointer-events: none;
   z-index: 0;
 }
@@ -77,13 +73,9 @@
   font-family: 'Playfair Display', 'Outfit', serif;
   font-size: 2.6rem;
   font-weight: 700;
-  color: white;
+  color: #0F172A;
   margin-bottom: 18px;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #fff 60%, var(--primary-light));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 .auth-page__branding p {
@@ -249,9 +241,10 @@
 }
 
 .auth-page__tab.active {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3), 0 0 12px rgba(0, 0, 0, 0.1);
+  background: var(--primary);
+  color: var(--dark);
+  font-weight: 700;
+  box-shadow: var(--shadow-yellow);
 }
 
 /* ── Form Heading ── */

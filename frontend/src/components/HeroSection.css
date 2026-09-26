@@ -13,7 +13,7 @@
   position: absolute;
   top: -30%; right: -15%;
   width: 900px; height: 900px;
-  background: radial-gradient(circle, rgba(0,0,0,0.03) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.02);
   border-radius: 50%;
   animation: float 10s ease-in-out infinite;
   filter: blur(40px);
@@ -24,7 +24,7 @@
   position: absolute;
   bottom: -25%; left: -15%;
   width: 700px; height: 700px;
-  background: radial-gradient(circle, rgba(0,0,0,0.02) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.015);
   border-radius: 50%;
   animation: float 12s ease-in-out infinite reverse;
   filter: blur(30px);
@@ -33,12 +33,6 @@
 .hero__grid-overlay {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
-  background-size: 80px 80px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -53,21 +47,21 @@
 .hero__orb--1 {
   width: 300px; height: 300px;
   top: 10%; right: 20%;
-  background: radial-gradient(circle, rgba(0,0,0,0.03) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.02);
   filter: blur(50px);
 }
 
 .hero__orb--2 {
   width: 250px; height: 250px;
   bottom: 20%; left: 10%;
-  background: radial-gradient(circle, rgba(0,0,0,0.025) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.02);
   filter: blur(40px);
 }
 
 .hero__orb--3 {
   width: 180px; height: 180px;
   top: 50%; right: 40%;
-  background: radial-gradient(circle, rgba(0,0,0,0.02) 0%, transparent 70%);
+  background: rgba(15, 23, 42, 0.015);
   filter: blur(35px);
 }
 
@@ -235,7 +229,7 @@
 
 .hero__stat-divider {
   width: 1px; height: 44px;
-  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.1), transparent);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 /* ── Visual Side ── */
@@ -308,7 +302,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FF6B4A, #FFAE00);
+  background: #FF6B4A;
   color: #FFFFFF;
   display: flex;
   align-items: center;
@@ -542,7 +536,7 @@
 
 .hero__side-line {
   width: 1px; height: 40px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.1), transparent);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 /* Responsive */

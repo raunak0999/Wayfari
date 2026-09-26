@@ -5,12 +5,12 @@ import { useBuddies } from '../context/BuddyContext';
 import './BuddyCard.css';
 
 const AVATAR_COLORS = [
-  'linear-gradient(135deg, #F97316, #FB923C)',
-  'linear-gradient(135deg, #8B5CF6, #A78BFA)',
-  'linear-gradient(135deg, #EC4899, #F472B6)',
-  'linear-gradient(135deg, #06B6D4, #22D3EE)',
-  'linear-gradient(135deg, #10B981, #34D399)',
-  'linear-gradient(135deg, #F59E0B, #FBBF24)',
+  '#F97316',
+  '#8B5CF6',
+  '#EC4899',
+  '#06B6D4',
+  '#10B981',
+  '#F59E0B',
 ];
 
 export default function BuddyCard({ buddy, showConnect = true }) {

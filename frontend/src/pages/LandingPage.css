@@ -16,13 +16,51 @@
 }
 
 .landing__gradient-text {
-  color: #06B6D4;
+  color: #0EA5E9;
   font-weight: 800;
   display: inline-block;
-  background: linear-gradient(135deg, #06B6D4, #2563EB);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+}
+
+.landing__stat-value {
+  display: block;
+  font-family: 'Outfit', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin-bottom: 6px;
+}
+
+.landing__step-num {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: #D97706;
+  opacity: 0.85;
+}
+
+.landing__step-line {
+  position: absolute;
+  right: -12px; top: 50%;
+  width: 24px; height: 2px;
+  background: var(--primary);
+  border-radius: 2px;
+}
+
+.landing__destination-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1;
+  transition: var(--transition);
+}
+
+.landing__destination-card:hover .landing__destination-img {
+  transform: scale(1.08);
+}
+
+.landing__destination-card:hover .landing__destination-overlay {
+  background: rgba(15, 23, 42, 0.6);
 }
 
 /* ── Infinite Marquee ── */
@@ -169,7 +207,7 @@
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   width: 900px; height: 350px;
-  background: radial-gradient(ellipse, rgba(0,0,0,0.05) 0%, transparent 70%);
+  background: rgba(0, 0, 0, 0.02);
   pointer-events: none;
 }
 
@@ -196,7 +234,7 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .landing__stat-card:hover {
@@ -217,10 +255,7 @@
   font-family: 'Outfit', sans-serif;
   font-size: 2.2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #111, #333);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #0F172A;
   margin-bottom: 6px;
 }
 
@@ -261,11 +296,8 @@
   font-weight: 900;
   font-size: 3.5rem;
   line-height: 1;
-  background: linear-gradient(135deg, var(--primary), var(--neon-purple));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  opacity: 0.7;
+  color: #D97706;
+  opacity: 0.85;
 }
 
 .landing__step-icon {
@@ -286,7 +318,7 @@
   position: absolute;
   right: -12px; top: 50%;
   width: 24px; height: 2px;
-  background: linear-gradient(90deg, var(--primary), var(--neon-purple));
+  background: var(--primary);
   border-radius: 2px;
   box-shadow: 0 0 12px rgba(0,0,0,0.3);
 }
@@ -328,7 +360,7 @@
 .landing__destination-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, transparent 100%);
+  background: rgba(0,0,0,0.45);
   z-index: 1;
   transition: var(--transition);
 }
@@ -338,7 +370,7 @@
 }
 
 .landing__destination-card:hover .landing__destination-overlay {
-  background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
+  background: rgba(0,0,0,0.65);
 }
 
 .landing__destination-card:hover {
@@ -448,7 +480,7 @@
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   width: 750px; height: 750px;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.08) 0%, rgba(0,0,0,0.04) 40%, transparent 70%);
+  background: rgba(0, 0, 0, 0.03);
   border-radius: 50%;
   animation: float 10s ease-in-out infinite;
   pointer-events: none;
@@ -463,7 +495,6 @@
   font-size: clamp(1.8rem, 4vw, 3.2rem);
   margin-bottom: 18px;
   color: white;
-  -webkit-text-fill-color: white;
 }
 
 .landing__cta-content p {
@@ -484,7 +515,7 @@
   position: absolute;
   inset: -4px;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.3), rgba(0,0,0,0.2));
+  background: rgba(0,0,0,0.2);
   z-index: -1;
   filter: blur(18px);
   opacity: 0;
