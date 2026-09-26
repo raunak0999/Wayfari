@@ -121,17 +121,19 @@
 .hero__highlight {
   position: relative;
   display: inline-block;
-  color: #111;
-  -webkit-text-fill-color: #111;
+  color: var(--dark);
+  margin-left: 10px;
 }
 
 .hero__highlight::after {
   content: '';
   position: absolute;
-  bottom: 4px; left: 0; right: 0;
-  height: 3px;
-  background: #111;
+  bottom: 6px; left: 0; right: 0;
+  height: 6px;
+  background: var(--gradient-yellow);
   border-radius: 4px;
+  z-index: -1;
+  opacity: 0.85;
 }
 
 /* Subtitle */

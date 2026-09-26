@@ -88,15 +88,6 @@ export default function HeroSection() {
             <span>Find Your Perfect</span>
             <span className="hero__highlight">
               Travel Buddy
-              <svg className="hero__highlight-gradient" viewBox="0 0 300 12" preserveAspectRatio="none">
-                <rect width="300" height="12" rx="6" fill="url(#heroGrad)" />
-                <defs>
-                  <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#6c63ff" />
-                    <stop offset="100%" stopColor="#f857a6" />
-                  </linearGradient>
-                </defs>
-              </svg>
             </span>
           </h1>
 
