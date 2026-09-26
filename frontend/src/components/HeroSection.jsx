@@ -57,7 +57,7 @@ export default function HeroSection() {
       const cy = (clientY / window.innerHeight - 0.5) * 2;
 
       gsap.to('.hero__floating-card', { x: cx * 15, y: cy * 15, duration: 0.8, ease: 'power2.out' });
-      gsap.to('.hero__image-card', { x: cx * -8, y: cy * -8, duration: 1, ease: 'power2.out' });
+      gsap.to('.hero__showcase-card', { x: cx * -8, y: cy * -8, duration: 1, ease: 'power2.out' });
       gsap.to([orb1.current, orb2.current, orb3.current], { x: cx * 25, duration: 1.2, ease: 'power2.out' });
     };
     window.addEventListener('mousemove', handleMouse);
