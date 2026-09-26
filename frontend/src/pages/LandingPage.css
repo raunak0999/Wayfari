@@ -16,7 +16,10 @@
 }
 
 .landing__gradient-text {
-  background: linear-gradient(135deg, var(--primary), var(--neon-purple));
+  color: #06B6D4;
+  font-weight: 800;
+  display: inline-block;
+  background: linear-gradient(135deg, #06B6D4, #2563EB);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

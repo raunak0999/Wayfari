@@ -396,27 +396,36 @@
   font-size: 0.78rem;
 }
 
-.hero__floating-card--1 { bottom: 18%; left: -8%; }
-.hero__floating-card--2 { top: 8%; right: -6%; }
-
-.hero__floating-pulse {
-  width: 10px; height: 10px;
-  background: var(--success);
-  border-radius: 50%;
-  position: relative;
-  margin-left: auto;
+.hero__floating-card--bottom {
+  bottom: -24px;
+  left: -24px;
+  z-index: 10;
 }
 
-.hero__floating-pulse::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid var(--success);
-  animation: ripple 2s ease-out infinite;
+.hero__floating-card--top {
+  top: -24px;
+  right: -24px;
+  background: #0F172A;
+  color: #FFFFFF;
+  border-color: #1E293B;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.25);
+  z-index: 10;
 }
 
-.hero__floating-card--2::after { display: none; }
+.hero__floating-card--top strong,
+.hero__floating-card--top span {
+  color: #FFFFFF;
+}
+
+.hero__match-badge {
+  background: var(--primary);
+  color: #0F172A;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+}
 
 /* Orbit ring */
 .hero__orbit-ring {
