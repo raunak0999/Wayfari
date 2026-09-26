@@ -144,15 +144,16 @@ export default function SafetyHub() {
   };
 
   // ── SOS Instant 1-Click Trigger ──
-  const dispatchSOS = useCallback((lat, lng) => {
-    const mapsLink = lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : 'Location unavailable';
-    const message = `🚨 EMERGENCY SOS ALERT from Wayfari!\nI need immediate assistance!\nMy current live location: ${mapsLink}`;
+  const dispatchSOS = useCallback((lat, lng, fallbackCity) => {
+    const locText = lat && lng ? `Lat: ${lat}, Lng: ${lng}` : (fallbackCity || 'Location unavailable');
+    const mapsLink = lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : (fallbackCity ? `Location: ${fallbackCity}` : 'Location unavailable');
+    const message = `🚨 EMERGENCY SOS ALERT from Wayfari!\nI need immediate assistance!\nMy current location: ${mapsLink}`;
 
     // Log the SOS event
     const sosEntry = {
       id: Date.now(),
       time: new Date().toISOString(),
-      location: lat && lng ? `${lat}, ${lng}` : 'Location unavailable',
+      location: locText,
       mapsLink,
       contactsNotified: safetyContacts.map(c => c.name || c.phone).filter(Boolean),
     };
@@ -161,7 +162,6 @@ export default function SafetyHub() {
     // Background notification send (No browser redirect)
     const contactsWithPhone = safetyContacts.filter(c => c.phone);
     if (contactsWithPhone.length > 0) {
-      // Trigger background alert dispatch via fetch API if backend is active
       try {
         fetch('/api/checkin/sos', {
           method: 'POST',
@@ -174,7 +174,7 @@ export default function SafetyHub() {
         }).catch(() => { /* silent background attempt */ });
       } catch { /* ignore */ }
 
-      showToast(`🆘 EMERGENCY SOS ACTIVATED! Live location (${lat || 'N/A'}, ${lng || 'N/A'}) dispatched to ${contactsWithPhone.length} trusted contact(s)!`);
+      showToast(`🆘 EMERGENCY SOS ACTIVATED! Emergency alert (${locText}) dispatched to ${contactsWithPhone.length} trusted contact(s)!`);
     } else {
       showToast('⚠️ SOS Logged! Please add trusted contacts with phone numbers below.');
     }
@@ -184,6 +184,12 @@ export default function SafetyHub() {
 
   const handleSOSClick = useCallback(() => {
     setSosTriggered(true);
+
+    // If coordinates are already active/cached in state, dispatch SOS immediately
+    if (coords?.lat && coords?.lng) {
+      dispatchSOS(coords.lat, coords.lng);
+      return;
+    }
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -195,14 +201,16 @@ export default function SafetyHub() {
         },
         (err) => {
           console.warn('Geolocation error during SOS:', err);
-          dispatchSOS(coords?.lat, coords?.lng);
+          // Fall back gracefully to existing coords or user city
+          const fallbackLocation = user?.city || user?.profile?.city || null;
+          dispatchSOS(coords?.lat, coords?.lng, fallbackLocation);
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
       );
     } else {
-      dispatchSOS(coords?.lat, coords?.lng);
+      dispatchSOS(coords?.lat, coords?.lng, user?.city);
     }
-  }, [coords, dispatchSOS]);
+  }, [coords, dispatchSOS, user]);
 
   // ── Contacts CRUD ──
   const addContact = () => {
