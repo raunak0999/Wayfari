@@ -323,7 +323,14 @@ export function AuthProvider({ children }) {
         console.warn('Supabase signOut error / network blocked:', err);
       }
     }
+    // Clear all Wayfari-related storage
     setStoredAuth(null);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PROFILES_KEY);
+    localStorage.removeItem('wayfari_connections');
+    localStorage.removeItem('wayfari_conversations');
+    localStorage.removeItem('wayfari_messages');
+    localStorage.removeItem('wayfari_trips');
     setUser(null);
     setProfile(null);
   };

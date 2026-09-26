@@ -121,6 +121,7 @@ export function BuddyProvider({ children }) {
 
   // Load buddies
   const loadBuddies = useCallback(async () => {
+    let supabaseProfiles = [];
     if (useSupabase) {
       try {
         const { data, error } = await supabase
@@ -128,21 +129,17 @@ export function BuddyProvider({ children }) {
           .select('*')
           .eq('profile_complete', true);
 
-        if (error || !data || data.length === 0) {
-          setBuddies(SEED_BUDDIES);
-        } else {
-          // Merge Supabase profiles with SEED_BUDDIES so dummy travelers are always available
-          const supabaseIds = new Set(data.map(p => p.id));
-          const extraSeed = SEED_BUDDIES.filter(b => !supabaseIds.has(b.id));
-          setBuddies([...data, ...extraSeed]);
+        if (!error && data && data.length > 0) {
+          supabaseProfiles = data;
         }
       } catch (err) {
         console.warn('Supabase loadBuddies error / blocked by browser:', err);
-        setBuddies(SEED_BUDDIES);
       }
-    } else {
-      setBuddies(SEED_BUDDIES);
     }
+    // Always merge with SEED_BUDDIES so dummy travelers are always visible
+    const supabaseIds = new Set(supabaseProfiles.map(p => p.id));
+    const extraSeed = SEED_BUDDIES.filter(b => !supabaseIds.has(b.id));
+    setBuddies([...supabaseProfiles, ...extraSeed]);
     setLoading(false);
   }, [useSupabase]);
 
