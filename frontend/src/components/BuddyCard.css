@@ -51,6 +51,21 @@
   z-index: 2;
 }
 
+.compat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--dark);
+  color: #FFFFFF;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 0.82rem;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
+  border: 1px solid #1E293B;
+}
+
 .buddy-card__header {
   display: flex;
   align-items: center;
@@ -67,15 +82,15 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 20px rgba(255, 107, 44, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 18px rgba(6, 182, 212, 0.25);
+  border: 2px solid #FFFFFF;
   position: relative;
   transition: var(--transition);
 }
 
 .buddy-card:hover .buddy-card__avatar {
   transform: scale(1.08);
-  box-shadow: 0 6px 24px rgba(255, 107, 44, 0.35);
+  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.45);
 }
 
 .buddy-card__avatar-ring {
@@ -83,7 +98,7 @@
   inset: -4px;
   border-radius: 50%;
   border: 2px solid transparent;
-  background: linear-gradient(135deg, var(--primary), var(--neon-purple)) border-box;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--primary)) border-box;
   -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -107,7 +122,9 @@
 }
 
 .buddy-card__name {
-  font-size: 1.08rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dark);
   margin-bottom: 2px;
   position: relative;
   z-index: 2;
@@ -115,7 +132,8 @@
 
 .buddy-card__meta {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .buddy-card__destination {
@@ -123,21 +141,21 @@
   align-items: center;
   gap: 8px;
   padding: 11px 16px;
-  background: rgba(255, 107, 44, 0.04);
-  border: 1px solid rgba(255, 107, 44, 0.08);
+  background: #FFFBEB;
+  border: 1.5px solid #FDE68A;
   border-radius: var(--radius);
   margin-bottom: 14px;
-  font-weight: 500;
+  font-weight: 700;
   font-size: 0.9rem;
-  color: var(--text);
+  color: #92400E;
   position: relative;
   z-index: 2;
   transition: var(--transition);
 }
 
 .buddy-card:hover .buddy-card__destination {
-  background: rgba(255, 107, 44, 0.07);
-  border-color: rgba(255, 107, 44, 0.15);
+  background: #FEF3C7;
+  border-color: #F59E0B;
 }
 
 .buddy-card__dest-icon { font-size: 1.1rem; }
@@ -152,8 +170,11 @@
 }
 
 .buddy-card__hobby {
-  font-size: 0.75rem !important;
-  padding: 4px 12px !important;
+  font-size: 0.78rem !important;
+  padding: 5px 14px !important;
+  background: #F1F5F9 !important;
+  color: var(--dark) !important;
+  border: 1px solid #CBD5E1 !important;
 }
 
 .buddy-card__music {
@@ -165,13 +186,14 @@
   margin-bottom: 16px;
   position: relative;
   z-index: 2;
+  font-weight: 500;
 }
 
 .buddy-card__music-icon { font-size: 1rem; }
 
 .buddy-card__actions {
   padding-top: 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1.5px solid var(--border);
   position: relative;
   z-index: 2;
 }
