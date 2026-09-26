@@ -19,7 +19,7 @@ export default function ChatPage() {
 
   // Auto-select first conversation on desktop/tablet if none selected
   useEffect(() => {
-    const isMobile = window.innerWidth <= 768;
+    const isMobile = window.innerWidth <= 992;
     if (!activeConvo && conversations.length > 0 && !isMobile) {
       const first = conversations[0];
       setActiveConvo(first);

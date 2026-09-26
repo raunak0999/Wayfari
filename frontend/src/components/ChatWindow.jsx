@@ -209,6 +209,18 @@ export default function ChatWindow({ conversation, onBack }) {
           placeholder="Type a message..."
           value={text}
           onChange={e => setText(e.target.value)}
+          onFocus={() => {
+            if (window.innerWidth <= 992) {
+              setTimeout(() => {
+                window.scrollTo(0, 0);
+              }, 60);
+            }
+          }}
+          onBlur={() => {
+            if (window.innerWidth <= 992) {
+              window.scrollTo(0, 0);
+            }
+          }}
           id="chat-input"
         />
         <button

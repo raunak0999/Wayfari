@@ -200,7 +200,7 @@
   transform: rotate(-45deg) translate(5px, -5px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
   .navbar__hamburger { display: flex; }
 
   .navbar__links {
