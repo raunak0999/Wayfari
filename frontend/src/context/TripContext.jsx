@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getTripEndDate } from '../utils/tripUtils';
 
@@ -23,21 +23,54 @@ export function TripProvider({ children }) {
   const [trips, setTrips] = useState(getStoredTrips);
   const [loading, setLoading] = useState(false);
   const useSupabase = isSupabaseConfigured();
+  const syncingRef = useRef(false);
 
-  // Load all trips from Supabase and merge with local storage
+  // Helper to map DB row to unified trip object
+  const formatDbTrip = (t) => {
+    let meta = {};
+    if (t.title && typeof t.title === 'string' && t.title.startsWith('{')) {
+      try { meta = JSON.parse(t.title); } catch { /* ignore */ }
+    }
+
+    const p = t.profiles || {};
+    return {
+      ...t,
+      id: t.id,
+      userId: t.user_id,
+      user_id: t.user_id,
+      destination: t.destination,
+      departure_date: t.departure_date,
+      departureDate: t.departure_date,
+      return_date: t.return_date,
+      duration: meta.duration || p.trip_duration || '7 days',
+      trip_duration: meta.duration || p.trip_duration || '7 days',
+      group_size: meta.group_size || p.group_size || '2',
+      groupSize: meta.group_size || p.group_size || '2',
+      travel_style: meta.travel_style || p.travel_style || 'Mid-range',
+      travelStyle: meta.travel_style || p.travel_style || 'Mid-range',
+      status: meta.status || 'active',
+      user_name: p.name || 'Traveler',
+      user_avatar: p.avatar_url || null,
+      user_city: p.city || '',
+      user_age: p.age || null,
+      user_gender: p.gender || 'other',
+      user_hobbies: p.hobbies || [],
+      user_music: p.music || [],
+    };
+  };
+
+  // Load all trips from Supabase and auto-sync any local trips
   const loadTrips = useCallback(async () => {
     setLoading(true);
     let dbTrips = [];
 
     if (useSupabase) {
       try {
-        // Try join query with profiles first
         let { data, error } = await supabase
           .from('trips')
           .select('*, profiles(*)')
           .order('created_at', { ascending: false });
 
-        // Fallback to simple select if join fails
         if (error || !data) {
           const fallback = await supabase
             .from('trips')
@@ -48,42 +81,69 @@ export function TripProvider({ children }) {
         }
 
         if (!error && data) {
-          dbTrips = data.map(t => {
-            // Parse metadata from title if JSON
-            let meta = {};
-            if (t.title && typeof t.title === 'string' && t.title.startsWith('{')) {
-              try { meta = JSON.parse(t.title); } catch { /* ignore */ }
-            }
-
-            const p = t.profiles || {};
-            return {
-              ...t,
-              id: t.id,
-              userId: t.user_id,
-              user_id: t.user_id,
-              destination: t.destination,
-              departure_date: t.departure_date,
-              departureDate: t.departure_date,
-              return_date: t.return_date,
-              duration: meta.duration || p.trip_duration || '7 days',
-              trip_duration: meta.duration || p.trip_duration || '7 days',
-              group_size: meta.group_size || p.group_size || '2',
-              groupSize: meta.group_size || p.group_size || '2',
-              travel_style: meta.travel_style || p.travel_style || 'Mid-range',
-              travelStyle: meta.travel_style || p.travel_style || 'Mid-range',
-              status: meta.status || 'active',
-              user_name: p.name || 'Traveler',
-              user_avatar: p.avatar_url || null,
-              user_city: p.city || '',
-              user_age: p.age || null,
-              user_gender: p.gender || 'other',
-              user_hobbies: p.hobbies || [],
-              user_music: p.music || [],
-            };
-          });
+          dbTrips = data.map(formatDbTrip);
         }
       } catch (err) {
         console.warn('Supabase loadTrips error:', err);
+      }
+
+      // Auto-sync: Check if current logged in user has local trips not yet in Supabase
+      if (!syncingRef.current) {
+        try {
+          syncingRef.current = true;
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+
+          if (authUser) {
+            const localTrips = getStoredTrips();
+            const existingDbDests = new Set(
+              dbTrips.filter(t => t.user_id === authUser.id).map(t => `${t.destination}_${t.departure_date}`)
+            );
+
+            const unsyncedTrips = localTrips.filter(lt => {
+              const matchesUser = lt.user_id === authUser.id || lt.userId === authUser.id || !lt.user_id;
+              const notInCloud = !existingDbDests.has(`${lt.destination}_${lt.departure_date || lt.departureDate}`);
+              return matchesUser && notInCloud && lt.destination;
+            });
+
+            if (unsyncedTrips.length > 0) {
+              console.log(`Auto-syncing ${unsyncedTrips.length} local trip(s) to Supabase cloud for user:`, authUser.email);
+              for (const unsynced of unsyncedTrips) {
+                const depDate = unsynced.departureDate || unsynced.departure_date || null;
+                const dur = unsynced.duration || unsynced.trip_duration || '7 days';
+                const retDate = unsynced.return_date || getTripEndDate(depDate, dur);
+
+                const meta = {
+                  duration: dur,
+                  group_size: unsynced.groupSize || unsynced.group_size || '2',
+                  travel_style: unsynced.travelStyle || unsynced.travel_style || 'Mid-range',
+                  status: 'active'
+                };
+
+                await supabase.from('trips').insert({
+                  user_id: authUser.id,
+                  destination: unsynced.destination,
+                  title: JSON.stringify(meta),
+                  departure_date: depDate,
+                  return_date: retDate,
+                });
+              }
+
+              // Re-fetch after syncing so state has the cloud trips
+              const refetch = await supabase
+                .from('trips')
+                .select('*, profiles(*)')
+                .order('created_at', { ascending: false });
+
+              if (refetch.data && !refetch.error) {
+                dbTrips = refetch.data.map(formatDbTrip);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Auto-sync error:', syncErr);
+        } finally {
+          syncingRef.current = false;
+        }
       }
     }
 
@@ -103,8 +163,9 @@ export function TripProvider({ children }) {
     if (useSupabase) {
       try {
         const channel = supabase
-          .channel('trips-changes')
+          .channel('trips-realtime-feed')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
+            console.log('Realtime trip change detected — reloading trips');
             loadTrips();
           })
           .subscribe();
@@ -130,7 +191,6 @@ export function TripProvider({ children }) {
     const duration = trip.duration || '7 days';
     const returnDate = getTripEndDate(departureDate, duration);
 
-    // Meta object stored as JSON in title
     const meta = {
       duration: duration,
       group_size: trip.groupSize || trip.group_size || '2',
@@ -138,11 +198,21 @@ export function TripProvider({ children }) {
       status: 'active'
     };
 
+    let targetUserId = trip.userId;
+    if (useSupabase) {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          targetUserId = authUser.id;
+        }
+      } catch { /* ignore */ }
+    }
+
     const localTrip = {
       ...trip,
       id: 'trip_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      user_id: trip.userId,
-      userId: trip.userId,
+      user_id: targetUserId,
+      userId: targetUserId,
       destination: trip.destination,
       departure_date: departureDate,
       departureDate: departureDate,
@@ -166,18 +236,17 @@ export function TripProvider({ children }) {
       user_bio: trip.user_bio || '',
     };
 
-    // Update local state and localStorage immediately
+    // Update local state immediately
     setTrips(prev => {
       const updated = [localTrip, ...prev];
       saveStoredTrips(updated);
       return updated;
     });
 
-    if (useSupabase) {
+    if (useSupabase && targetUserId) {
       try {
-        // Valid Supabase columns: id, user_id, destination, title, departure_date, return_date
         const dbPayload = {
-          user_id: trip.userId,
+          user_id: targetUserId,
           destination: trip.destination,
           title: JSON.stringify(meta),
           departure_date: departureDate,
@@ -187,14 +256,14 @@ export function TripProvider({ children }) {
         const { data, error } = await supabase
           .from('trips')
           .insert(dbPayload)
-          .select()
-          .single();
+          .select();
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
+          const inserted = data[0];
           const fullData = {
             ...localTrip,
-            id: data.id,
-            created_at: data.created_at,
+            id: inserted.id,
+            created_at: inserted.created_at,
           };
           setTrips(prev => {
             const updated = prev.map(t => t.id === localTrip.id ? fullData : t);
@@ -218,13 +287,12 @@ export function TripProvider({ children }) {
     let updatedMeta = null;
 
     if (tripToUpdate) {
-      const currentMeta = {
+      updatedMeta = {
         duration: tripToUpdate.duration || '7 days',
         group_size: tripToUpdate.group_size || '2',
         travel_style: tripToUpdate.travel_style || 'Mid-range',
         status: updates.status || tripToUpdate.status || 'active',
       };
-      updatedMeta = currentMeta;
     }
 
     if (useSupabase && updatedMeta) {

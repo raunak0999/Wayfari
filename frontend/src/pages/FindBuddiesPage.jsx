@@ -43,12 +43,21 @@ export default function FindBuddiesPage() {
 
   const hasFilters = Object.values(filters).some(v => Boolean(v));
 
+  // Find Buddies should ONLY show OTHER travelers' posts
+  // A user's own trips belong exclusively in the "My Trips" section
+  const otherBuddies = useMemo(() => {
+    if (!user) return buddies;
+    return buddies.filter(b => b.userId !== user.id);
+  }, [buddies, user]);
+
   const filtered = useMemo(() => {
     if (hasFilters) {
-      return searchBuddies(filters);
+      const searched = searchBuddies(filters);
+      if (!user) return searched;
+      return searched.filter(b => b.userId !== user.id);
     }
-    return buddies;
-  }, [hasFilters, filters, searchBuddies, buddies]);
+    return otherBuddies;
+  }, [hasFilters, filters, searchBuddies, otherBuddies, user]);
 
   // Sort results
   const results = useMemo(() => {
@@ -86,7 +95,7 @@ export default function FindBuddiesPage() {
         <div className="find-page__header animate-fade-in-up">
           <div>
             <h1>Find Your <span className="find-page__highlight">Travel Buddy</span></h1>
-            <p>Connect with real travelers planning upcoming trips to your dream destinations.</p>
+            <p>Discover fellow travelers planning upcoming adventures to your dream destinations.</p>
           </div>
         </div>
 
@@ -97,7 +106,7 @@ export default function FindBuddiesPage() {
               <span className="find-page__search-icon">🔍</span>
               <input
                 className="find-page__search-input"
-                placeholder="Search by destination, place, or city (e.g. Bali, Tokyo, Paris)..."
+                placeholder="Search by destination, place, or city (e.g. Bali, Dubai, Tokyo)..."
                 value={filters.destination}
                 onChange={e => handleFilter('destination', e.target.value)}
                 id="search-destination"
@@ -114,7 +123,7 @@ export default function FindBuddiesPage() {
                     fontSize: '1rem',
                     padding: '0 4px',
                   }}
-                  title="Clear destination"
+                  title="Clear search"
                 >
                   ✕
                 </button>
@@ -226,7 +235,7 @@ export default function FindBuddiesPage() {
         {/* Results Header with Sort */}
         <div className="find-page__results-header">
           <span className="find-page__results-info">
-            {results.length} upcoming traveler{results.length !== 1 ? 's' : ''} found
+            {results.length} fellow traveler{results.length !== 1 ? 's' : ''} found
           </span>
           <div className="find-page__sort">
             <span className="find-page__sort-label">Sort by:</span>
@@ -252,24 +261,28 @@ export default function FindBuddiesPage() {
         ) : loading && buddies.length === 0 ? (
           <div className="find-page__empty card">
             <span>⏳</span>
-            <h3>Loading upcoming travelers...</h3>
+            <h3>Finding upcoming travelers...</h3>
           </div>
         ) : hasFilters ? (
           <div className="find-page__empty card">
             <span>🔍</span>
             <h3>No matching travelers found</h3>
-            <p>No upcoming trips match your current filters. Try searching a different place or clearing your filters.</p>
+            <p>No other travelers match your current search filters. Try typing a different place or clearing your filters.</p>
             <button className="btn btn--primary" onClick={clearFilters}>Clear Filters</button>
           </div>
         ) : (
           <div className="find-page__empty card">
-            <span style={{ fontSize: '3.5rem', display: 'block', marginBottom: '14px' }}>🗺️</span>
-            <h3>No Upcoming Trips Posted Yet</h3>
-            <p style={{ maxWidth: '440px', margin: '0 auto 20px', color: 'var(--text-secondary)' }}>
-              Be the first to post your trip! When you or other travelers post a trip, they will appear here so you can connect and travel together.
+            <span style={{ fontSize: '3.5rem', display: 'block', marginBottom: '14px' }}>🌍</span>
+            <h3>No Other Upcoming Trips Found Yet</h3>
+            <p style={{ maxWidth: '460px', margin: '0 auto 20px', color: 'var(--text-secondary)' }}>
+              {user ? (
+                <>Your posted trips are stored in your <strong>My Trips</strong> section. When friends or other travelers post trips, they will appear here so you can connect!</>
+              ) : (
+                <>Be the first to share your travel plans! Sign up or log in to post your trip and find travel buddies.</>
+              )}
             </p>
-            <Link to="/my-trips" className="btn btn--primary btn--lg">
-              + Post a Trip in My Trips
+            <Link to={user ? "/my-trips" : "/auth"} className="btn btn--primary btn--lg">
+              {user ? "View My Trips" : "Sign Up & Post a Trip"}
             </Link>
           </div>
         )}
