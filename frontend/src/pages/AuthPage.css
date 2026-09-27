@@ -65,21 +65,21 @@
 .auth-page__branding {
   position: relative;
   z-index: 1;
-  color: white;
+  color: #FFFFFF;
   max-width: 420px;
 }
 
 .auth-page__branding h1 {
-  font-family: 'Playfair Display', 'Outfit', serif;
+  font-family: 'Outfit', sans-serif;
   font-size: 2.6rem;
-  font-weight: 700;
-  color: #0F172A;
+  font-weight: 800;
+  color: #FFFFFF;
   margin-bottom: 18px;
   letter-spacing: -0.02em;
 }
 
 .auth-page__branding p {
-  color: var(--text-secondary);
+  color: #CBD5E1;
   font-size: 1.15rem;
   line-height: 1.8;
   margin-bottom: 36px;
@@ -97,14 +97,14 @@
   align-items: center;
   gap: 14px;
   padding: 14px 22px;
-  background: rgba(0,0,0,0.02);
+  background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(0,0,0,0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius);
   font-weight: 500;
   font-size: 0.95rem;
-  color: var(--text-secondary);
+  color: #F1F5F9;
   transition: var(--transition);
 }
 
@@ -114,11 +114,11 @@
 }
 
 .auth-page__feature:hover {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #FFC82C;
   transform: translateX(8px);
-  color: var(--text);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  color: #FFFFFF;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
 /* ── Floating Destination Tags ── */
