@@ -17,6 +17,9 @@ import MyTripsPage from './pages/MyTripsPage';
 import SafetyHubPage from './pages/SafetyHubPage';
 import BuddyProfilePage from './pages/BuddyProfilePage';
 import ChatPage from './pages/ChatPage';
+import { APP_VERSION } from './version';
+
+console.log('Wayfari Version:', APP_VERSION);
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
