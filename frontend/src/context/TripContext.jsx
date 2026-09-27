@@ -196,15 +196,7 @@ export function TripProvider({ children }) {
       status: 'active'
     };
 
-    let targetUserId = trip.userId;
-    if (useSupabase) {
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-          targetUserId = authUser.id;
-        }
-      } catch { /* ignore */ }
-    }
+    const targetUserId = trip.userId || trip.user_id || 'user_' + Date.now();
 
     const localTrip = {
       ...trip,
@@ -234,51 +226,54 @@ export function TripProvider({ children }) {
       user_bio: trip.user_bio || '',
     };
 
-    // Update local state immediately
+    // 1. Update local state and localStorage IMMEDIATELY (0ms delay!)
     setTrips(prev => {
       const updated = [localTrip, ...prev];
       saveStoredTrips(updated);
       return updated;
     });
 
-    if (useSupabase && targetUserId) {
-      try {
-        const dbPayload = {
-          user_id: targetUserId,
-          destination: trip.destination,
-          title: JSON.stringify(meta),
-          departure_date: departureDate,
-          return_date: returnDate,
-        };
+    // 2. Sync to Supabase in the background
+    if (useSupabase) {
+      (async () => {
+        try {
+          // Get verified user ID if available
+          let authId = targetUserId;
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData?.user) {
+            authId = authData.user.id;
+          }
 
-        const { data, error } = await supabase
-          .from('trips')
-          .insert(dbPayload)
-          .select();
-
-        if (!error && data && data.length > 0) {
-          const inserted = data[0];
-          const fullData = {
-            ...localTrip,
-            id: inserted.id,
-            created_at: inserted.created_at,
+          const dbPayload = {
+            user_id: authId,
+            destination: trip.destination,
+            title: JSON.stringify(meta),
+            departure_date: departureDate,
+            return_date: returnDate,
           };
-          setTrips(prev => {
-            const updated = prev.map(t => t.id === localTrip.id ? fullData : t);
-            saveStoredTrips(updated);
-            return updated;
-          });
-          return fullData;
-        } else if (error) {
-          console.warn('Supabase trip insert error details:', error);
+
+          const { data, error } = await supabase
+            .from('trips')
+            .insert(dbPayload)
+            .select();
+
+          if (!error && data && data.length > 0) {
+            const inserted = data[0];
+            setTrips(prev => {
+              const updated = prev.map(t => t.id === localTrip.id ? { ...localTrip, id: inserted.id, user_id: authId, userId: authId, created_at: inserted.created_at } : t);
+              saveStoredTrips(updated);
+              return updated;
+            });
+          }
+        } catch (err) {
+          console.warn('Background Supabase trip sync error:', err);
         }
-      } catch (err) {
-        console.warn('Supabase trip insert error:', err);
-      }
+      })();
     }
 
     return localTrip;
   }, [useSupabase]);
+
 
   const updateTrip = useCallback(async (tripId, updates) => {
     const tripToUpdate = trips.find(t => t.id === tripId);
