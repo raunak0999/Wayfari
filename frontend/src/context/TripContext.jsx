@@ -355,8 +355,8 @@ export function TripProvider({ children }) {
   }, [useSupabase, trips]);
 
   const getUserTrips = useCallback((userId) => {
-    if (!userId) return [];
-    return trips.filter(t => t.user_id === userId || t.userId === userId);
+    if (!userId) return trips;
+    return trips.filter(t => t.user_id === userId || t.userId === userId || !t.user_id || String(t.user_id).startsWith('local_'));
   }, [trips]);
 
   return (
