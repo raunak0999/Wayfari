@@ -29,12 +29,12 @@ const getStoredLocalProfiles = () => {
 
 export function BuddyProvider({ children }) {
   const { trips, loading: tripsLoading } = useTrips();
-  const [profiles, setProfiles] = useState({});
+  const [profiles, setProfiles] = useState(getStoredLocalProfiles);
   const [connections, setConnections] = useState(getStoredConnections);
-  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [profilesLoading, setProfilesLoading] = useState(false);
   const useSupabase = isSupabaseConfigured();
 
-  // Load all user profiles from Supabase and local storage
+  // Load all user profiles from Supabase and merge with local storage
   const loadProfiles = useCallback(async () => {
     let dbProfiles = {};
     if (useSupabase) {
@@ -114,19 +114,16 @@ export function BuddyProvider({ children }) {
   /**
    * Derive REAL travelers dynamically from active trips.
    * - No dummy / seed data!
-   * - Exclude trips that have already ended (ended < today).
-   * - Exclude trips marked as 'completed'.
+   * - Shows every upcoming trip where travel has not ended yet.
    */
   const buddies = useMemo(() => {
     if (!trips || trips.length === 0) return [];
 
     return trips
       .filter(trip => {
-        // Exclude completed trips
         if (trip.status === 'completed') return false;
         const depDate = trip.departure_date || trip.departureDate;
         const duration = trip.duration || trip.trip_duration || '7 days';
-        // Only include active / upcoming trips (end date >= today)
         return matchesPreferenceDate(depDate, duration, null);
       })
       .map(trip => {
@@ -141,7 +138,7 @@ export function BuddyProvider({ children }) {
           age: profile.age || trip.user_age || 25,
           gender: profile.gender || trip.user_gender || 'other',
           city: profile.city || trip.user_city || 'Global Nomad',
-          bio: profile.bio || trip.user_bio || 'Excited to explore the world with fellow travel buddies!',
+          bio: profile.bio || trip.user_bio || 'Excited to explore with fellow travel buddies!',
           avatar: profile.avatar_url || profile.avatar || trip.user_avatar || null,
           avatar_url: profile.avatar_url || profile.avatar || trip.user_avatar || null,
           hobbies: profile.hobbies && profile.hobbies.length > 0 ? profile.hobbies : (trip.user_hobbies || []),
@@ -152,7 +149,7 @@ export function BuddyProvider({ children }) {
           destination: trip.destination,
           departure_date: trip.departure_date || trip.departureDate,
           departureDate: trip.departure_date || trip.departureDate,
-          departure_time: trip.departure_time || trip.departureTime,
+          return_date: trip.return_date,
           trip_duration: trip.duration || trip.trip_duration || '7 days',
           duration: trip.duration || trip.trip_duration || '7 days',
           group_size: trip.group_size || trip.groupSize || '2',
@@ -297,7 +294,6 @@ export function BuddyProvider({ children }) {
 
   // ── Connection Management ──
   const sendConnectionRequest = useCallback(async (userId, targetBuddy) => {
-    // targetBuddy can be an ID or an object with userId / id
     const targetUserId = typeof targetBuddy === 'object'
       ? (targetBuddy.userId || targetBuddy.id)
       : targetBuddy;
@@ -379,7 +375,6 @@ export function BuddyProvider({ children }) {
       .filter(c => c.status === 'accepted' && (c.from_user_id === userId || c.to_user_id === userId))
       .map(c => {
         const buddyUserId = c.from_user_id === userId ? c.to_user_id : c.from_user_id;
-        // Look up profile
         const prof = profiles[buddyUserId];
         if (prof) {
           return {
@@ -393,7 +388,6 @@ export function BuddyProvider({ children }) {
             destination: prof.destination || 'Upcoming Adventure',
           };
         }
-        // Fallback: look in buddies list
         const fromBuddies = buddies.find(b => b.userId === buddyUserId);
         if (fromBuddies) {
           return {
@@ -419,15 +413,10 @@ export function BuddyProvider({ children }) {
   }, [connections, profiles, buddies]);
 
   // ── Search & Filter Buddies ──
-  const searchBuddies = useCallback((filters = {}, currentUserId = null) => {
+  const searchBuddies = useCallback((filters = {}) => {
     let results = [...buddies];
 
-    // Exclude viewer's own trips
-    if (currentUserId) {
-      results = results.filter(b => b.userId !== currentUserId);
-    }
-
-    // Destination filter
+    // Destination or place filter (case-insensitive substring)
     if (filters.destination && filters.destination.trim()) {
       const q = filters.destination.toLowerCase().trim();
       results = results.filter(b =>

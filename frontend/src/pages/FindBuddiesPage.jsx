@@ -43,17 +43,12 @@ export default function FindBuddiesPage() {
 
   const hasFilters = Object.values(filters).some(v => Boolean(v));
 
-  // Exclude current user's own trips so you don't match with yourself
-  const allOtherBuddies = useMemo(() => {
-    return buddies.filter(b => b.userId !== user?.id);
-  }, [buddies, user?.id]);
-
   const filtered = useMemo(() => {
     if (hasFilters) {
-      return searchBuddies(filters, user?.id);
+      return searchBuddies(filters);
     }
-    return allOtherBuddies;
-  }, [hasFilters, filters, searchBuddies, user?.id, allOtherBuddies]);
+    return buddies;
+  }, [hasFilters, filters, searchBuddies, buddies]);
 
   // Sort results
   const results = useMemo(() => {
@@ -91,7 +86,7 @@ export default function FindBuddiesPage() {
         <div className="find-page__header animate-fade-in-up">
           <div>
             <h1>Find Your <span className="find-page__highlight">Travel Buddy</span></h1>
-            <p>Connect with real travelers planning upcoming adventures to your destinations.</p>
+            <p>Connect with real travelers planning upcoming trips to your dream destinations.</p>
           </div>
         </div>
 
@@ -102,11 +97,28 @@ export default function FindBuddiesPage() {
               <span className="find-page__search-icon">🔍</span>
               <input
                 className="find-page__search-input"
-                placeholder="Search by destination or city..."
+                placeholder="Search by destination, place, or city (e.g. Bali, Tokyo, Paris)..."
                 value={filters.destination}
                 onChange={e => handleFilter('destination', e.target.value)}
                 id="search-destination"
               />
+              {filters.destination && (
+                <button
+                  type="button"
+                  onClick={() => handleFilter('destination', '')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    fontSize: '1rem',
+                    padding: '0 4px',
+                  }}
+                  title="Clear destination"
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <button
               className="btn btn--outline find-page__filter-toggle"
@@ -127,7 +139,7 @@ export default function FindBuddiesPage() {
                   onChange={e => handleFilter('date', e.target.value)}
                 />
                 <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px' }}>
-                  Only shows travelers active on or ahead of this date
+                  Only shows travelers with trips on or ahead of this date
                 </small>
               </div>
 
@@ -237,7 +249,7 @@ export default function FindBuddiesPage() {
               <BuddyCard key={buddy.id} buddy={buddy} />
             ))}
           </div>
-        ) : loading ? (
+        ) : loading && buddies.length === 0 ? (
           <div className="find-page__empty card">
             <span>⏳</span>
             <h3>Loading upcoming travelers...</h3>
@@ -246,15 +258,15 @@ export default function FindBuddiesPage() {
           <div className="find-page__empty card">
             <span>🔍</span>
             <h3>No matching travelers found</h3>
-            <p>No upcoming trips match your current filters. Try adjusting your destination or travel dates.</p>
+            <p>No upcoming trips match your current filters. Try searching a different place or clearing your filters.</p>
             <button className="btn btn--primary" onClick={clearFilters}>Clear Filters</button>
           </div>
         ) : (
           <div className="find-page__empty card">
             <span style={{ fontSize: '3.5rem', display: 'block', marginBottom: '14px' }}>🗺️</span>
-            <h3>No Other Upcoming Trips Yet</h3>
+            <h3>No Upcoming Trips Posted Yet</h3>
             <p style={{ maxWidth: '440px', margin: '0 auto 20px', color: 'var(--text-secondary)' }}>
-              Be the first to share your travel plans! When you post a trip, fellow travelers can discover you and connect to explore together.
+              Be the first to post your trip! When you or other travelers post a trip, they will appear here so you can connect and travel together.
             </p>
             <Link to="/my-trips" className="btn btn--primary btn--lg">
               + Post a Trip in My Trips
