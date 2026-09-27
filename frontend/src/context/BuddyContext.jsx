@@ -1,9 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { useTrips } from './TripContext';
+import { matchesPreferenceDate } from '../utils/tripUtils';
 
 const BuddyContext = createContext(null);
 
 const CONNECTIONS_KEY = 'wayfari_connections';
+const PROFILES_KEY = 'wayfari_profiles';
 
 const isSupabaseConfigured = () => {
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -19,128 +22,40 @@ const setStoredConnections = (conns) => {
   localStorage.setItem(CONNECTIONS_KEY, JSON.stringify(conns));
 };
 
-// Seed data — the buddies users can interact with
-const SEED_BUDDIES = [
-  {
-    id: 'seed_0',
-    name: 'Aanya Sharma', age: 26, gender: 'female', city: 'Mumbai',
-    destination: 'Bali, Indonesia', bio: 'Yoga instructor who loves exploring hidden temples and local cuisine. Happy to guide new travelers!',
-    hobbies: ['Yoga', 'Foodie', 'Culture', 'Photography'],
-    music: ['Jazz', 'World Music', 'Folk'],
-    travel_style: 'Mid-range', group_size: '2', noise_level: 'Moderate', sleep_schedule: 'Early Bird',
-    departure_date: '2026-06-15', trip_duration: '10 days', profile_complete: true,
-    travel_experience: 'expert'
-  },
-  {
-    id: 'seed_1',
-    name: 'Marcus Chen', age: 29, gender: 'male', city: 'San Francisco',
-    destination: 'Tokyo, Japan', bio: 'Software engineer by day, street photographer by night. Looking for a culture buddy!',
-    hobbies: ['Photography', 'Gaming', 'Foodie', 'Culture'],
-    music: ['Hip-Hop', 'EDM', 'Pop'],
-    travel_style: 'Mid-range', group_size: '2', noise_level: 'Moderate', sleep_schedule: 'Night Owl',
-    departure_date: '2026-07-01', trip_duration: '14 days', profile_complete: true,
-    travel_experience: 'intermediate'
-  },
-  {
-    id: 'seed_2',
-    name: 'Priya Patel', age: 24, gender: 'female', city: 'London',
-    destination: 'Santorini, Greece', bio: "First time solo traveler! Looking for an experienced buddy to show me the best spots. 🌊",
-    hobbies: ['Beach', 'Photography', 'Nightlife', 'Cycling'],
-    music: ['Pop', 'EDM', 'Rock'],
-    travel_style: 'Luxury', group_size: '3', noise_level: 'Lively', sleep_schedule: 'Night Owl',
-    departure_date: '2026-06-20', trip_duration: '7 days', profile_complete: true,
-    travel_experience: 'beginner'
-  },
-  {
-    id: 'seed_3',
-    name: 'Jake Morrison', age: 31, gender: 'male', city: 'Sydney',
-    destination: 'Patagonia, Argentina', bio: 'Hiking enthusiast and mountain lover. 40+ countries visited, glad to mentor fellow hikers!',
-    hobbies: ['Hiking', 'Photography', 'Cycling', 'Reading'],
-    music: ['Rock', 'Folk', 'Classical'],
-    travel_style: 'Budget', group_size: 'Solo', noise_level: 'Quiet', sleep_schedule: 'Early Bird',
-    departure_date: '2026-08-10', trip_duration: '21 days', profile_complete: true,
-    travel_experience: 'expert'
-  },
-  {
-    id: 'seed_4',
-    name: 'Sofia Rodriguez', age: 27, gender: 'female', city: 'Barcelona',
-    destination: 'Marrakech, Morocco', bio: 'Foodie and culture lover. I travel for the food, stay for the stories. 🍜',
-    hobbies: ['Foodie', 'Culture', 'Yoga', 'Reading'],
-    music: ['World Music', 'Jazz', 'Folk'],
-    travel_style: 'Budget', group_size: '4', noise_level: 'Moderate', sleep_schedule: 'Flexible',
-    departure_date: '2026-07-15', trip_duration: '12 days', profile_complete: true,
-    travel_experience: 'intermediate'
-  },
-  {
-    id: 'seed_5',
-    name: 'Ryan Kim', age: 25, gender: 'male', city: 'Seoul',
-    destination: 'Bangkok, Thailand', bio: 'First time visiting Thailand! Looking for a seasoned buddy to explore street food scenes. 🍜',
-    hobbies: ['Foodie', 'Photography', 'Nightlife', 'Gaming'],
-    music: ['Pop', 'Hip-Hop', 'EDM'],
-    travel_style: 'Budget', group_size: '3', noise_level: 'Lively', sleep_schedule: 'Night Owl',
-    departure_date: '2026-06-25', trip_duration: '10 days', profile_complete: true,
-    travel_experience: 'beginner'
-  },
-  {
-    id: 'seed_6',
-    name: 'Emma Wilson', age: 28, gender: 'female', city: 'Toronto',
-    destination: 'Iceland', bio: 'Northern lights chaser & road trip veteran! Happy to buddy up with first-timers.',
-    hobbies: ['Photography', 'Hiking', 'Reading', 'Yoga'],
-    music: ['Classical', 'Folk', 'Jazz'],
-    travel_style: 'Mid-range', group_size: '2', noise_level: 'Quiet', sleep_schedule: 'Early Bird',
-    departure_date: '2026-09-01', trip_duration: '8 days', profile_complete: true,
-    travel_experience: 'expert'
-  },
-  {
-    id: 'seed_7',
-    name: 'Diego Santos', age: 30, gender: 'male', city: 'São Paulo',
-    destination: 'Barcelona, Spain', bio: "Beach volleyball player and nightlife enthusiast. Let's hit the Mediterranean!",
-    hobbies: ['Beach', 'Nightlife', 'Cycling', 'Foodie'],
-    music: ['EDM', 'Hip-Hop', 'World Music'],
-    travel_style: 'Mid-range', group_size: '4+', noise_level: 'Lively', sleep_schedule: 'Night Owl',
-    departure_date: '2026-07-20', trip_duration: '14 days', profile_complete: true,
-    travel_experience: 'intermediate'
-  },
-  {
-    id: 'seed_8',
-    name: 'Lily Zhang', age: 23, gender: 'female', city: 'Shanghai',
-    destination: 'Paris, France', bio: 'Art student visiting Europe for the very first time! 🎨',
-    hobbies: ['Culture', 'Photography', 'Reading', 'Foodie'],
-    music: ['Classical', 'Jazz', 'Pop'],
-    travel_style: 'Mid-range', group_size: '2', noise_level: 'Moderate', sleep_schedule: 'Flexible',
-    departure_date: '2026-08-05', trip_duration: '10 days', profile_complete: true,
-    travel_experience: 'beginner'
-  }
-];
+const getStoredLocalProfiles = () => {
+  try { return JSON.parse(localStorage.getItem(PROFILES_KEY)) || {}; }
+  catch { return {}; }
+};
 
 export function BuddyProvider({ children }) {
-  const [buddies, setBuddies] = useState(SEED_BUDDIES);
-  const [connections, setConnections] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { trips, loading: tripsLoading } = useTrips();
+  const [profiles, setProfiles] = useState({});
+  const [connections, setConnections] = useState(getStoredConnections);
+  const [profilesLoading, setProfilesLoading] = useState(true);
   const useSupabase = isSupabaseConfigured();
 
-  // Load buddies
-  const loadBuddies = useCallback(async () => {
-    let supabaseProfiles = [];
+  // Load all user profiles from Supabase and local storage
+  const loadProfiles = useCallback(async () => {
+    let dbProfiles = {};
     if (useSupabase) {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
-          .eq('profile_complete', true);
+          .select('*');
 
-        if (!error && data && data.length > 0) {
-          supabaseProfiles = data;
+        if (!error && data) {
+          data.forEach(p => {
+            dbProfiles[p.id] = p;
+          });
         }
       } catch (err) {
-        console.warn('Supabase loadBuddies error / blocked by browser:', err);
+        console.warn('Supabase loadProfiles error:', err);
       }
     }
-    // Always merge with SEED_BUDDIES so dummy travelers are always visible
-    const supabaseIds = new Set(supabaseProfiles.map(p => p.id));
-    const extraSeed = SEED_BUDDIES.filter(b => !supabaseIds.has(b.id));
-    setBuddies([...supabaseProfiles, ...extraSeed]);
-    setLoading(false);
+    const localProfiles = getStoredLocalProfiles();
+    const merged = { ...localProfiles, ...dbProfiles };
+    setProfiles(merged);
+    setProfilesLoading(false);
   }, [useSupabase]);
 
   // Load connections
@@ -153,47 +68,114 @@ export function BuddyProvider({ children }) {
           return;
         }
       } catch (err) {
-        console.warn('Supabase loadConnections error / blocked by browser:', err);
+        console.warn('Supabase loadConnections error:', err);
       }
     }
-    // Local fallback
     setConnections(getStoredConnections());
   }, [useSupabase]);
 
   useEffect(() => {
-    loadBuddies();
+    loadProfiles();
     loadConnections();
 
     if (useSupabase) {
-      const connSub = supabase
-        .channel('connections-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, () => {
-          loadConnections();
-        })
-        .subscribe();
+      try {
+        const profileSub = supabase
+          .channel('profiles-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+            loadProfiles();
+          })
+          .subscribe();
 
-      return () => { supabase.removeChannel(connSub); };
+        const connSub = supabase
+          .channel('connections-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, () => {
+            loadConnections();
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(profileSub);
+          supabase.removeChannel(connSub);
+        };
+      } catch (err) {
+        console.warn('Supabase realtime subscription error:', err);
+      }
     }
-  }, [loadBuddies, loadConnections, useSupabase]);
+  }, [loadProfiles, loadConnections, useSupabase]);
 
-  // Save connections to localStorage whenever they change
+  // Save connections locally whenever they change
   useEffect(() => {
     if (!useSupabase && connections.length > 0) {
       setStoredConnections(connections);
     }
   }, [connections, useSupabase]);
 
+  /**
+   * Derive REAL travelers dynamically from active trips.
+   * - No dummy / seed data!
+   * - Exclude trips that have already ended (ended < today).
+   * - Exclude trips marked as 'completed'.
+   */
+  const buddies = useMemo(() => {
+    if (!trips || trips.length === 0) return [];
+
+    return trips
+      .filter(trip => {
+        // Exclude completed trips
+        if (trip.status === 'completed') return false;
+        const depDate = trip.departure_date || trip.departureDate;
+        const duration = trip.duration || trip.trip_duration || '7 days';
+        // Only include active / upcoming trips (end date >= today)
+        return matchesPreferenceDate(depDate, duration, null);
+      })
+      .map(trip => {
+        const userId = trip.user_id || trip.userId;
+        const profile = profiles[userId] || {};
+
+        return {
+          id: trip.id,
+          tripId: trip.id,
+          userId: userId,
+          name: profile.name || trip.user_name || 'Traveler',
+          age: profile.age || trip.user_age || 25,
+          gender: profile.gender || trip.user_gender || 'other',
+          city: profile.city || trip.user_city || 'Global Nomad',
+          bio: profile.bio || trip.user_bio || 'Excited to explore the world with fellow travel buddies!',
+          avatar: profile.avatar_url || profile.avatar || trip.user_avatar || null,
+          avatar_url: profile.avatar_url || profile.avatar || trip.user_avatar || null,
+          hobbies: profile.hobbies && profile.hobbies.length > 0 ? profile.hobbies : (trip.user_hobbies || []),
+          music: profile.music && profile.music.length > 0 ? profile.music : (trip.user_music || []),
+          travel_experience: profile.travel_experience || trip.user_experience || 'intermediate',
+          noise_level: profile.noise_level || 'Moderate',
+          sleep_schedule: profile.sleep_schedule || 'Flexible',
+          destination: trip.destination,
+          departure_date: trip.departure_date || trip.departureDate,
+          departureDate: trip.departure_date || trip.departureDate,
+          departure_time: trip.departure_time || trip.departureTime,
+          trip_duration: trip.duration || trip.trip_duration || '7 days',
+          duration: trip.duration || trip.trip_duration || '7 days',
+          group_size: trip.group_size || trip.groupSize || '2',
+          groupSize: trip.group_size || trip.groupSize || '2',
+          travel_style: trip.travel_style || trip.travelStyle || 'Mid-range',
+          travelStyle: trip.travel_style || trip.travelStyle || 'Mid-range',
+          status: trip.status || 'active',
+          profile_complete: true,
+          created_at: trip.created_at,
+        };
+      });
+  }, [trips, profiles]);
+
   // ── Compatibility Algorithm ──
   const calculateCompatibility = useCallback((userProfile, buddy) => {
+    if (!buddy) return 75;
     const userHobbies = userProfile?.hobbies || userProfile?.interests?.hobbies || [];
-    const userMusic = userProfile?.music || userProfile?.interests?.music || [];
     const userStyle = userProfile?.travelStyle || userProfile?.travel_style || userProfile?.preferences?.travelStyle;
     const userSize = userProfile?.groupSize || userProfile?.group_size || userProfile?.preferences?.groupSize;
     const userDest = userProfile?.destination || userProfile?.preferences?.destination || '';
     const userExp = userProfile?.travelExperience || userProfile?.travel_experience || 'beginner';
 
     const buddyHobbies = buddy.hobbies || [];
-    const buddyMusic = buddy.music || [];
     const buddyStyle = buddy.travel_style || buddy.travelStyle;
     const buddySize = buddy.group_size || buddy.groupSize;
     const buddyDest = buddy.destination || '';
@@ -202,64 +184,51 @@ export function BuddyProvider({ children }) {
     let score = 0;
     let total = 0;
 
-    // 1. Experience Mentorship Match (25 points)
-    // Concept: Pair less experienced (beginner) with more experienced (expert/intermediate)
-    if (userExp && buddyExp) {
-      total += 25;
-      if (userExp === 'beginner') {
-        if (buddyExp === 'expert') score += 25; // Perfect mentor match!
-        else if (buddyExp === 'intermediate') score += 20;
-        else score += 10; // Both beginners
-      } else if (userExp === 'expert') {
-        if (buddyExp === 'beginner') score += 25; // Great opportunity to mentor
-        else score += 15;
-      } else { // intermediate
-        if (buddyExp === 'expert') score += 22;
-        else if (buddyExp === 'beginner') score += 20;
-        else score += 15;
-      }
-    }
+    // 1. Mentorship / Experience match (25 points)
+    total += 25;
+    if (userExp === 'beginner' && buddyExp === 'expert') score += 25;
+    else if (userExp === 'beginner' && buddyExp === 'intermediate') score += 20;
+    else if (userExp === 'expert' && buddyExp === 'beginner') score += 25;
+    else if (userExp === buddyExp) score += 18;
+    else score += 12;
 
     // 2. Destination match (25 points)
     if (userDest && buddyDest) {
       total += 25;
-      const uLower = userDest.toLowerCase();
-      const bLower = buddyDest.toLowerCase();
-      if (uLower === bLower) {
-        score += 25;
-      } else if (bLower.includes(uLower) || uLower.includes(bLower)) {
-        score += 18;
-      } else {
-        score += 3;
-      }
+      const u = userDest.toLowerCase();
+      const b = buddyDest.toLowerCase();
+      if (u === b) score += 25;
+      else if (u.includes(b) || b.includes(u)) score += 20;
+      else score += 5;
     }
 
-    // 3. Travel Style / Budget (15 points)
-    if (userStyle) {
+    // 3. Travel style / budget match (15 points)
+    if (userStyle && buddyStyle) {
       total += 15;
-      score += (userStyle === buddyStyle ? 15 : 4);
+      score += (userStyle === buddyStyle ? 15 : 5);
     }
 
     // 4. Hobbies overlap (20 points)
-    if (userHobbies.length && buddyHobbies.length) {
+    if (userHobbies.length > 0 && buddyHobbies.length > 0) {
       total += 20;
       const overlap = userHobbies.filter(h => buddyHobbies.includes(h)).length;
-      const maxH = Math.max(userHobbies.length, buddyHobbies.length, 1);
-      score += (overlap / maxH) * 20;
+      const maxPossible = Math.max(userHobbies.length, buddyHobbies.length, 1);
+      score += Math.round((overlap / maxPossible) * 20);
     }
 
     // 5. Group size (15 points)
-    if (userSize) {
+    if (userSize && buddySize) {
       total += 15;
-      score += (userSize === buddySize ? 15 : 4);
+      score += (userSize === buddySize ? 15 : 5);
     }
 
-    const pct = total > 0 ? Math.round((score / total) * 100) : 75;
-    return Math.max(45, Math.min(99, pct));
+    const pct = total > 0 ? Math.round((score / total) * 100) : 80;
+    return Math.max(50, Math.min(99, pct));
   }, []);
 
   // ── Detailed Breakdown ──
   const getCompatibilityBreakdown = useCallback((userProfile, buddy) => {
+    if (!buddy) return [];
     const userHobbies = userProfile?.hobbies || userProfile?.interests?.hobbies || [];
     const userMusic = userProfile?.music || userProfile?.interests?.music || [];
     const userStyle = userProfile?.travelStyle || userProfile?.travel_style || userProfile?.preferences?.travelStyle;
@@ -282,7 +251,7 @@ export function BuddyProvider({ children }) {
       label: 'Hobbies',
       icon: '🎯',
       score: hobbyPct,
-      detail: hobbyOverlap.length > 0 ? `${hobbyOverlap.length} shared: ${hobbyOverlap.join(', ')}` : 'No shared hobbies',
+      detail: hobbyOverlap.length > 0 ? `${hobbyOverlap.length} shared: ${hobbyOverlap.join(', ')}` : 'No shared hobbies yet',
     });
 
     // Music
@@ -290,136 +259,211 @@ export function BuddyProvider({ children }) {
     const musicMax = Math.max(userMusic.length, buddyMusic.length, 1);
     const musicPct = userMusic.length ? Math.round((musicOverlap.length / musicMax) * 100) : 0;
     breakdown.push({
-      label: 'Music',
+      label: 'Music Taste',
       icon: '🎵',
       score: musicPct,
-      detail: musicOverlap.length > 0 ? `${musicOverlap.length} shared: ${musicOverlap.join(', ')}` : 'No shared tastes',
+      detail: musicOverlap.length > 0 ? `${musicOverlap.length} shared genres` : 'Different musical vibes',
     });
 
     // Travel Style
-    const styleMatch = userStyle === buddyStyle;
+    const styleMatch = userStyle && buddyStyle && userStyle === buddyStyle;
     breakdown.push({
       label: 'Travel Style',
       icon: '✨',
-      score: userStyle ? (styleMatch ? 100 : 20) : 0,
-      detail: styleMatch ? `Both prefer ${buddyStyle}` : `You: ${userStyle || 'N/A'} · They: ${buddyStyle}`,
+      score: styleMatch ? 100 : 30,
+      detail: styleMatch ? `Both prefer ${userStyle}` : `You: ${userStyle || 'Flexible'} · They: ${buddyStyle || 'Flexible'}`,
     });
 
     // Destination
-    const destMatch = userDest && buddyDest &&
-      (userDest.toLowerCase().includes(buddyDest.toLowerCase()) || buddyDest.toLowerCase().includes(userDest.toLowerCase()));
+    const destMatch = userDest && buddyDest && userDest.toLowerCase().includes(buddyDest.toLowerCase());
     breakdown.push({
       label: 'Destination',
       icon: '📍',
-      score: !userDest ? 0 : destMatch ? 100 : 15,
-      detail: destMatch ? `Both heading to ${buddyDest}!` : buddyDest,
+      score: destMatch ? 100 : 20,
+      detail: destMatch ? `Both heading to ${buddyDest}!` : `Their trip: ${buddyDest || 'Various'}`,
     });
 
     // Group Size
-    const sizeMatch = userSize === buddySize;
+    const sizeMatch = userSize && buddySize && userSize === buddySize;
     breakdown.push({
       label: 'Group Size',
       icon: '👥',
-      score: userSize ? (sizeMatch ? 100 : 30) : 0,
-      detail: sizeMatch ? `Both want ${buddySize}` : `You: ${userSize || 'N/A'} · They: ${buddySize}`,
+      score: sizeMatch ? 100 : 40,
+      detail: sizeMatch ? `Both prefer group of ${userSize}` : `You: ${userSize || 'Any'} · They: ${buddySize || 'Any'}`,
     });
 
     return breakdown;
   }, []);
 
-  // ── Connections ──
-  const sendConnectionRequest = useCallback(async (userId, buddyId) => {
+  // ── Connection Management ──
+  const sendConnectionRequest = useCallback(async (userId, targetBuddy) => {
+    // targetBuddy can be an ID or an object with userId / id
+    const targetUserId = typeof targetBuddy === 'object'
+      ? (targetBuddy.userId || targetBuddy.id)
+      : targetBuddy;
+
+    if (!userId || !targetUserId || userId === targetUserId) return;
+
+    // Check if connection already exists
     const existing = connections.find(c =>
-      (c.from_user_id === userId && c.to_user_id === buddyId) ||
-      (c.from_user_id === buddyId && c.to_user_id === userId)
+      (c.from_user_id === userId && c.to_user_id === targetUserId) ||
+      (c.from_user_id === targetUserId && c.to_user_id === userId)
     );
     if (existing) return existing;
 
-    const conn = {
-      id: 'conn_' + Date.now(),
+    const newConn = {
+      id: 'conn_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       from_user_id: userId,
-      to_user_id: buddyId,
+      to_user_id: targetUserId,
       status: 'pending',
-      created_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
     };
 
-    setConnections(prev => {
-      const updated = [...prev, conn];
-      setStoredConnections(updated);
-      return updated;
-    });
+    setConnections(prev => [...prev, newConn]);
 
-    if (useSupabase && !buddyId.startsWith('seed_')) {
-      const { data, error } = await supabase
-        .from('connections')
-        .insert({ from_user_id: userId, to_user_id: buddyId, status: 'pending' })
-        .select()
-        .single();
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase
+          .from('connections')
+          .insert({
+            from_user_id: userId,
+            to_user_id: targetUserId,
+            status: 'pending'
+          })
+          .select()
+          .single();
 
-      if (!error && data) {
-        conn.id = data.id;
+        if (data && !error) {
+          setConnections(prev => prev.map(c => c.id === newConn.id ? data : c));
+          newConn.id = data.id;
+        }
+      } catch (err) {
+        console.warn('Supabase sendConnectionRequest error:', err);
       }
     }
 
-    // Auto-accept after 2 seconds
-    setTimeout(() => {
-      setConnections(prev => {
-        const updated = prev.map(c =>
-          c.id === conn.id ? { ...c, status: 'accepted' } : c
-        );
-        setStoredConnections(updated);
-        return updated;
-      });
+    // Auto-accept after 1.5s so users can immediately test chatting with their match
+    setTimeout(async () => {
+      setConnections(prev => prev.map(c =>
+        c.id === newConn.id ? { ...c, status: 'accepted' } : c
+      ));
 
-      if (useSupabase && !buddyId.startsWith('seed_') && conn.id) {
-        supabase.from('connections').update({ status: 'accepted' }).eq('id', conn.id);
+      if (useSupabase) {
+        try {
+          await supabase
+            .from('connections')
+            .update({ status: 'accepted' })
+            .eq('id', newConn.id);
+        } catch { /* ignore */ }
       }
-    }, 2000);
+    }, 1500);
 
-    return conn;
+    return newConn;
   }, [connections, useSupabase]);
 
-  const getConnectionStatus = useCallback((userId, buddyId) => {
+  const getConnectionStatus = useCallback((userId, targetBuddy) => {
+    const targetUserId = typeof targetBuddy === 'object'
+      ? (targetBuddy.userId || targetBuddy.id)
+      : targetBuddy;
+
     const conn = connections.find(c =>
-      (c.from_user_id === userId && c.to_user_id === buddyId) ||
-      (c.from_user_id === buddyId && c.to_user_id === userId)
+      (c.from_user_id === userId && c.to_user_id === targetUserId) ||
+      (c.from_user_id === targetUserId && c.to_user_id === userId)
     );
     return conn?.status || null;
   }, [connections]);
 
   const getAcceptedConnections = useCallback((userId) => {
+    if (!userId) return [];
     return connections
-      .filter(c => c.status === 'accepted' &&
-        (c.from_user_id === userId || c.to_user_id === userId))
+      .filter(c => c.status === 'accepted' && (c.from_user_id === userId || c.to_user_id === userId))
       .map(c => {
-        const buddyId = c.from_user_id === userId ? c.to_user_id : c.from_user_id;
-        return buddies.find(b => b.id === buddyId);
+        const buddyUserId = c.from_user_id === userId ? c.to_user_id : c.from_user_id;
+        // Look up profile
+        const prof = profiles[buddyUserId];
+        if (prof) {
+          return {
+            id: buddyUserId,
+            userId: buddyUserId,
+            name: prof.name || 'Traveler',
+            avatar: prof.avatar_url || prof.avatar || null,
+            avatar_url: prof.avatar_url || prof.avatar || null,
+            city: prof.city || '',
+            bio: prof.bio || '',
+            destination: prof.destination || 'Upcoming Adventure',
+          };
+        }
+        // Fallback: look in buddies list
+        const fromBuddies = buddies.find(b => b.userId === buddyUserId);
+        if (fromBuddies) {
+          return {
+            id: buddyUserId,
+            userId: buddyUserId,
+            name: fromBuddies.name,
+            avatar: fromBuddies.avatar,
+            avatar_url: fromBuddies.avatar_url,
+            city: fromBuddies.city,
+            bio: fromBuddies.bio,
+            destination: fromBuddies.destination,
+          };
+        }
+        return {
+          id: buddyUserId,
+          userId: buddyUserId,
+          name: 'Traveler',
+          avatar: null,
+          destination: 'Trip Match',
+        };
       })
       .filter(Boolean);
-  }, [connections, buddies]);
+  }, [connections, profiles, buddies]);
 
-  const searchBuddies = useCallback((filters) => {
+  // ── Search & Filter Buddies ──
+  const searchBuddies = useCallback((filters = {}, currentUserId = null) => {
     let results = [...buddies];
 
-    if (filters.destination) {
+    // Exclude viewer's own trips
+    if (currentUserId) {
+      results = results.filter(b => b.userId !== currentUserId);
+    }
+
+    // Destination filter
+    if (filters.destination && filters.destination.trim()) {
+      const q = filters.destination.toLowerCase().trim();
       results = results.filter(b =>
-        (b.destination || '').toLowerCase().includes(filters.destination.toLowerCase())
+        (b.destination || '').toLowerCase().includes(q) ||
+        (b.city || '').toLowerCase().includes(q)
       );
     }
+
+    // Preference date filter:
+    // Only show if anyone is travelling on/ahead of preference date, and trip not ended
+    if (filters.date) {
+      results = results.filter(b => {
+        const depDate = b.departure_date || b.departureDate;
+        const dur = b.trip_duration || b.duration || '7 days';
+        return matchesPreferenceDate(depDate, dur, filters.date);
+      });
+    }
+
+    // Travel style filter
     if (filters.travelStyle) {
       results = results.filter(b => (b.travel_style || b.travelStyle) === filters.travelStyle);
     }
+
+    // Group size filter
     if (filters.groupSize) {
       results = results.filter(b => (b.group_size || b.groupSize) === filters.groupSize);
     }
-    if (filters.date) {
-      results = results.filter(b => (b.departure_date || b.departureDate) >= filters.date);
-    }
-    if (filters.hobby) {
-      results = results.filter(b => (b.hobbies || []).includes(filters.hobby));
-    }
+
+    // Experience filter
     if (filters.experience) {
       results = results.filter(b => (b.travel_experience || b.travelExperience) === filters.experience);
+    }
+
+    // Hobby filter
+    if (filters.hobby) {
+      results = results.filter(b => (b.hobbies || []).includes(filters.hobby));
     }
 
     return results;
@@ -428,6 +472,7 @@ export function BuddyProvider({ children }) {
   return (
     <BuddyContext.Provider value={{
       buddies,
+      profiles,
       connections,
       calculateCompatibility,
       getCompatibilityBreakdown,
@@ -435,7 +480,7 @@ export function BuddyProvider({ children }) {
       getConnectionStatus,
       getAcceptedConnections,
       searchBuddies,
-      loading
+      loading: tripsLoading || profilesLoading,
     }}>
       {children}
     </BuddyContext.Provider>

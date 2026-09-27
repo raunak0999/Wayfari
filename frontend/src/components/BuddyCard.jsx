@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBuddies } from '../context/BuddyContext';
+import { formatTripDate } from '../utils/tripUtils';
 import './BuddyCard.css';
 
 const AVATAR_COLORS = [
@@ -19,8 +20,11 @@ export default function BuddyCard({ buddy, showConnect = true }) {
   const navigate = useNavigate();
   const cardRef = useRef(null);
 
+  const targetUserId = buddy.userId || buddy.id;
+  const isOwnTrip = user && targetUserId === user.id;
+
   const compatibility = calculateCompatibility(user?.profile || user?.preferences || user, buddy);
-  const connectionStatus = user ? getConnectionStatus(user.id, buddy.id) : null;
+  const connectionStatus = user ? getConnectionStatus(user.id, targetUserId) : null;
 
   const buddyAvatar = buddy.avatar || buddy.avatar_url;
   const buddyHobbies = buddy.hobbies || [];
@@ -35,7 +39,7 @@ export default function BuddyCard({ buddy, showConnect = true }) {
       navigate('/auth');
       return;
     }
-    sendConnectionRequest(user.id, buddy.id);
+    sendConnectionRequest(user.id, targetUserId);
   };
 
   const handleCardClick = () => {
@@ -78,6 +82,7 @@ export default function BuddyCard({ buddy, showConnect = true }) {
           🛡️
         </div>
       )}
+
       <div className="buddy-card__compat">
         <div className="compat-badge">
           <span>🔥</span> {compatibility}% Match
@@ -89,13 +94,15 @@ export default function BuddyCard({ buddy, showConnect = true }) {
           {buddyAvatar ? (
             <img src={buddyAvatar} alt={buddy.name} />
           ) : (
-            <span>{buddy.name?.[0]}</span>
+            <span>{buddy.name?.[0]?.toUpperCase() || '?'}</span>
           )}
           <div className="buddy-card__avatar-ring" />
         </div>
         <div className="buddy-card__info">
           <h4 className="buddy-card__name">{buddy.name}</h4>
-          <p className="buddy-card__meta">{buddy.age} · {buddy.city}</p>
+          <p className="buddy-card__meta">
+            {buddy.age ? `${buddy.age} yrs` : 'Traveler'} {buddy.city ? `· ${buddy.city}` : ''}
+          </p>
         </div>
       </div>
 
@@ -104,9 +111,59 @@ export default function BuddyCard({ buddy, showConnect = true }) {
         <span>{buddyDest}</span>
       </div>
 
-      <div style={{ padding: '0 16px', marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className="badge badge--info" style={{ fontSize: '0.75rem' }}>
-          {buddy.travel_experience === 'expert' ? '🏔️ Seasoned Expert Mentor' : buddy.travel_experience === 'beginner' ? '🔰 First-Time Traveler' : '🧳 Intermediate Traveler'}
+      {/* Trip Departure and Duration Info */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 14px',
+        background: '#F8FAFC',
+        border: '1px solid var(--border)',
+        borderRadius: '12px',
+        marginBottom: '12px',
+        fontSize: '0.82rem',
+        color: '#475569',
+        fontWeight: 600,
+        gap: '6px',
+        flexWrap: 'wrap'
+      }}>
+        <span>📅 {formatTripDate(buddy.departure_date)}</span>
+        <span>⏱️ {buddy.trip_duration || buddy.duration || '7 days'}</span>
+      </div>
+
+      {/* Group & Style tags */}
+      <div style={{
+        display: 'flex',
+        gap: '6px',
+        marginBottom: '10px',
+        flexWrap: 'wrap',
+        fontSize: '0.75rem'
+      }}>
+        <span style={{
+          background: '#FFFBEB',
+          border: '1px solid #FDE68A',
+          color: '#92400E',
+          padding: '3px 10px',
+          borderRadius: '16px',
+          fontWeight: 700
+        }}>
+          👥 Group of {buddy.group_size || buddy.groupSize || '2'}
+        </span>
+        <span style={{
+          background: '#EFF6FF',
+          border: '1px solid #BFDBFE',
+          color: '#1E40AF',
+          padding: '3px 10px',
+          borderRadius: '16px',
+          fontWeight: 700
+        }}>
+          ✨ {buddy.travel_style || buddy.travelStyle || 'Mid-range'}
+        </span>
+      </div>
+
+      <div style={{ padding: '0 2px', marginBottom: '8px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="badge badge--info" style={{ fontSize: '0.73rem' }}>
+          {buddy.travel_experience === 'expert' ? '🏔️ Seasoned Expert' : buddy.travel_experience === 'beginner' ? '🔰 First-Timer' : '🧳 Experienced'}
         </span>
         {user?.travel_experience === 'beginner' && buddy.travel_experience === 'expert' && (
           <span className="badge badge--success" style={{ fontSize: '0.72rem' }}>
@@ -115,20 +172,28 @@ export default function BuddyCard({ buddy, showConnect = true }) {
         )}
       </div>
 
-      <div className="buddy-card__chips">
-        {buddyHobbies.slice(0, 4).map(h => (
-          <span key={h} className="chip chip--active buddy-card__hobby">{h}</span>
-        ))}
-      </div>
+      {buddyHobbies.length > 0 && (
+        <div className="buddy-card__chips">
+          {buddyHobbies.slice(0, 4).map(h => (
+            <span key={h} className="chip chip--active buddy-card__hobby">{h}</span>
+          ))}
+        </div>
+      )}
 
-      <div className="buddy-card__music">
-        <span className="buddy-card__music-icon">🎵</span>
-        <span>{buddyMusic.slice(0, 3).join(', ')}</span>
-      </div>
+      {buddyMusic.length > 0 && (
+        <div className="buddy-card__music">
+          <span className="buddy-card__music-icon">🎵</span>
+          <span>{buddyMusic.slice(0, 3).join(', ')}</span>
+        </div>
+      )}
 
       {showConnect && (
         <div className="buddy-card__actions">
-          {connectionStatus === 'accepted' ? (
+          {isOwnTrip ? (
+            <button className="btn btn--sm btn--outline buddy-card__btn" disabled style={{ opacity: 0.8 }}>
+              ⭐ Your Posted Trip
+            </button>
+          ) : connectionStatus === 'accepted' ? (
             <button className="btn btn--sm btn--primary buddy-card__btn" disabled style={{ opacity: 0.7 }}>
               ✓ Connected
             </button>

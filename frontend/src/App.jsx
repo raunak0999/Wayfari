@@ -106,15 +106,15 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
-          <BuddyProvider>
-            <TripProvider>
+          <TripProvider>
+            <BuddyProvider>
               <ChatProvider>
                 <AnimatedLayout>
                   <AppRoutes />
                 </AnimatedLayout>
               </ChatProvider>
-            </TripProvider>
-          </BuddyProvider>
+            </BuddyProvider>
+          </TripProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

@@ -35,9 +35,10 @@ export default function ChatPage() {
 
   const handleInitConvo = async (buddy) => {
     if (!buddy || !user) return;
+    const targetUserId = buddy.userId || buddy.id;
     const convo = await getOrCreateConversation(
       user.id,
-      buddy.id,
+      targetUserId,
       buddy.name,
       buddy.avatar_url || buddy.avatar
     );
@@ -63,11 +64,12 @@ export default function ChatPage() {
   // Accepted buddies without an existing conversation
   const buddiesWithoutConvo = accepted.filter((buddy) => {
     if (!buddy) return false;
+    const bId = buddy.userId || buddy.id;
     return !conversations.some(
       (c) =>
-        c.participant_1 === buddy.id ||
-        c.participant_2 === buddy.id ||
-        (c.id && c.id.includes(buddy.id))
+        c.participant_1 === bId ||
+        c.participant_2 === bId ||
+        (c.id && c.id.includes(bId))
     );
   });
 

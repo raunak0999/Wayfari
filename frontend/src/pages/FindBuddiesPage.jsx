@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBuddies } from '../context/BuddyContext';
 import BuddyCard from '../components/BuddyCard';
@@ -13,7 +14,7 @@ const SORT_OPTIONS = [
 
 export default function FindBuddiesPage() {
   const { user } = useAuth();
-  const { buddies, searchBuddies, calculateCompatibility } = useBuddies();
+  const { buddies, searchBuddies, calculateCompatibility, loading } = useBuddies();
   const [filters, setFilters] = useState({
     destination: '',
     date: '',
@@ -30,11 +31,29 @@ export default function FindBuddiesPage() {
   };
 
   const clearFilters = () => {
-    setFilters({ destination: '', date: '', groupSize: '', travelStyle: '', hobby: '' });
+    setFilters({
+      destination: '',
+      date: '',
+      groupSize: '',
+      travelStyle: '',
+      experience: '',
+      hobby: '',
+    });
   };
 
-  const hasFilters = Object.values(filters).some(v => v);
-  const filtered = hasFilters ? searchBuddies(filters) : buddies;
+  const hasFilters = Object.values(filters).some(v => Boolean(v));
+
+  // Exclude current user's own trips so you don't match with yourself
+  const allOtherBuddies = useMemo(() => {
+    return buddies.filter(b => b.userId !== user?.id);
+  }, [buddies, user?.id]);
+
+  const filtered = useMemo(() => {
+    if (hasFilters) {
+      return searchBuddies(filters, user?.id);
+    }
+    return allOtherBuddies;
+  }, [hasFilters, filters, searchBuddies, user?.id, allOtherBuddies]);
 
   // Sort results
   const results = useMemo(() => {
@@ -52,8 +71,8 @@ export default function FindBuddiesPage() {
         break;
       case 'date':
         sorted.sort((a, b) => {
-          const dateA = a.departure_date || a.departureDate || '9999';
-          const dateB = b.departure_date || b.departureDate || '9999';
+          const dateA = a.departure_date || a.departureDate || '9999-99-99';
+          const dateB = b.departure_date || b.departureDate || '9999-99-99';
           return dateA.localeCompare(dateB);
         });
         break;
@@ -63,7 +82,7 @@ export default function FindBuddiesPage() {
     return sorted;
   }, [filtered, sortBy, calculateCompatibility, user]);
 
-  const activeFilterCount = Object.values(filters).filter(v => v).length;
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
     <div className="find-page" id="find-buddies-page">
@@ -72,7 +91,7 @@ export default function FindBuddiesPage() {
         <div className="find-page__header animate-fade-in-up">
           <div>
             <h1>Find Your <span className="find-page__highlight">Travel Buddy</span></h1>
-            <p>Discover compatible travelers heading to your dream destinations.</p>
+            <p>Connect with real travelers planning upcoming adventures to your destinations.</p>
           </div>
         </div>
 
@@ -83,7 +102,7 @@ export default function FindBuddiesPage() {
               <span className="find-page__search-icon">🔍</span>
               <input
                 className="find-page__search-input"
-                placeholder="Search by destination..."
+                placeholder="Search by destination or city..."
                 value={filters.destination}
                 onChange={e => handleFilter('destination', e.target.value)}
                 id="search-destination"
@@ -100,13 +119,16 @@ export default function FindBuddiesPage() {
           {showFilters && (
             <div className="find-page__filters animate-fade-in">
               <div className="form-group">
-                <label className="form-label">Date From</label>
+                <label className="form-label">Travelling From Date (Upcoming)</label>
                 <input
                   className="form-input"
                   type="date"
                   value={filters.date}
                   onChange={e => handleFilter('date', e.target.value)}
                 />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px' }}>
+                  Only shows travelers active on or ahead of this date
+                </small>
               </div>
 
               <div className="form-group">
@@ -192,7 +214,7 @@ export default function FindBuddiesPage() {
         {/* Results Header with Sort */}
         <div className="find-page__results-header">
           <span className="find-page__results-info">
-            {results.length} traveler{results.length !== 1 ? 's' : ''} found
+            {results.length} upcoming traveler{results.length !== 1 ? 's' : ''} found
           </span>
           <div className="find-page__sort">
             <span className="find-page__sort-label">Sort by:</span>
@@ -208,19 +230,35 @@ export default function FindBuddiesPage() {
           </div>
         </div>
 
-        {/* Buddy Grid */}
+        {/* Buddy Grid / Empty State */}
         {results.length > 0 ? (
           <div className="grid grid--3 stagger">
             {results.map(buddy => (
               <BuddyCard key={buddy.id} buddy={buddy} />
             ))}
           </div>
-        ) : (
+        ) : loading ? (
+          <div className="find-page__empty card">
+            <span>⏳</span>
+            <h3>Loading upcoming travelers...</h3>
+          </div>
+        ) : hasFilters ? (
           <div className="find-page__empty card">
             <span>🔍</span>
-            <h3>No travelers found</h3>
-            <p>Try adjusting your filters to see more results.</p>
+            <h3>No matching travelers found</h3>
+            <p>No upcoming trips match your current filters. Try adjusting your destination or travel dates.</p>
             <button className="btn btn--primary" onClick={clearFilters}>Clear Filters</button>
+          </div>
+        ) : (
+          <div className="find-page__empty card">
+            <span style={{ fontSize: '3.5rem', display: 'block', marginBottom: '14px' }}>🗺️</span>
+            <h3>No Other Upcoming Trips Yet</h3>
+            <p style={{ maxWidth: '440px', margin: '0 auto 20px', color: 'var(--text-secondary)' }}>
+              Be the first to share your travel plans! When you post a trip, fellow travelers can discover you and connect to explore together.
+            </p>
+            <Link to="/my-trips" className="btn btn--primary btn--lg">
+              + Post a Trip in My Trips
+            </Link>
           </div>
         )}
       </div>

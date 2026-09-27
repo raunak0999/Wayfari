@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBuddies } from '../context/BuddyContext';
 import { useChat } from '../context/ChatContext';
+import { formatTripDate } from '../utils/tripUtils';
 import './BuddyProfilePage.css';
 
 const AVATAR_COLORS = [
@@ -20,13 +21,16 @@ export default function BuddyProfilePage() {
   const { buddies, calculateCompatibility, getCompatibilityBreakdown, sendConnectionRequest, getConnectionStatus } = useBuddies();
   const { getOrCreateConversation } = useChat();
 
-  const buddy = buddies.find(b => b.id === id);
+  const buddy = buddies.find(b => b.id === id || b.tripId === id || b.userId === id);
 
   if (!buddy) {
     return (
       <div className="buddy-profile" id="buddy-profile-page">
         <div className="container" style={{ paddingTop: '120px', textAlign: 'center' }}>
-          <h2>Buddy not found</h2>
+          <h2>Trip or traveler not found</h2>
+          <p style={{ color: 'var(--text-secondary)', margin: '12px 0 24px' }}>
+            This trip may have concluded or was removed.
+          </p>
           <button className="btn btn--primary" onClick={() => navigate('/find-buddies')}>
             Back to Find Buddies
           </button>
@@ -35,9 +39,12 @@ export default function BuddyProfilePage() {
     );
   }
 
+  const targetUserId = buddy.userId || buddy.id;
+  const isOwnTrip = user && targetUserId === user.id;
+
   const compatibility = calculateCompatibility(user?.profile || user?.preferences || user, buddy);
   const breakdown = getCompatibilityBreakdown(user?.profile || user?.preferences || user, buddy);
-  const connectionStatus = user ? getConnectionStatus(user.id, buddy.id) : null;
+  const connectionStatus = user && targetUserId ? getConnectionStatus(user.id, targetUserId) : null;
   const colorIdx = String(buddy.id);
   const colorIndex = colorIdx.charCodeAt(colorIdx.length - 1) % AVATAR_COLORS.length;
 
@@ -47,7 +54,7 @@ export default function BuddyProfilePage() {
   const buddyAvatar = buddy.avatar || buddy.avatar_url;
   const buddyDest = buddy.destination || '';
   const buddyDepartureDate = buddy.departure_date || buddy.departureDate || 'Flexible';
-  const buddyDuration = buddy.trip_duration || buddy.tripDuration || 'TBD';
+  const buddyDuration = buddy.trip_duration || buddy.tripDuration || buddy.duration || 'TBD';
   const buddyGroupSize = buddy.group_size || buddy.groupSize || '2';
   const buddyTravelStyle = buddy.travel_style || buddy.travelStyle || 'Mid-range';
   const buddyNoiseLevel = buddy.noise_level || buddy.noiseLevel || 'Moderate';
@@ -60,12 +67,14 @@ export default function BuddyProfilePage() {
 
   const handleConnect = () => {
     if (!user) { navigate('/auth'); return; }
-    sendConnectionRequest(user.id, buddy.id);
+    if (isOwnTrip) return;
+    sendConnectionRequest(user.id, targetUserId);
   };
 
   const handleChat = async () => {
     if (!user) { navigate('/auth'); return; }
-    await getOrCreateConversation(user.id, buddy.id, buddy.name, buddyAvatar);
+    if (isOwnTrip) return;
+    await getOrCreateConversation(user.id, targetUserId, buddy.name, buddyAvatar);
     navigate('/chat');
   };
 
@@ -120,7 +129,11 @@ export default function BuddyProfilePage() {
             </div>
 
             <div className="buddy-profile__actions">
-              {connectionStatus === 'accepted' ? (
+              {isOwnTrip ? (
+                <button className="btn btn--outline btn--lg" disabled style={{ opacity: 0.85 }}>
+                  ⭐ Your Posted Trip
+                </button>
+              ) : connectionStatus === 'accepted' ? (
                 <button className="btn btn--primary btn--lg" onClick={handleChat}>
                   💬 Chat Now
                 </button>
@@ -149,7 +162,7 @@ export default function BuddyProfilePage() {
               </div>
               <div className="buddy-profile__detail-item">
                 <span>Departure</span>
-                <strong>{buddyDepartureDate}</strong>
+                <strong>{formatTripDate(buddyDepartureDate)}</strong>
               </div>
               <div className="buddy-profile__detail-item">
                 <span>Duration</span>

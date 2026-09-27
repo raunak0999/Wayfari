@@ -12,7 +12,19 @@ export default function MyTripsPage() {
   const myTrips = getUserTrips(user?.id);
 
   const handlePostTrip = (formData) => {
-    addTrip({ ...formData, userId: user.id });
+    addTrip({
+      ...formData,
+      userId: user.id,
+      user_name: user.profile?.displayName || user.name || 'Traveler',
+      user_avatar: user.profile?.avatar || user.profile?.avatar_url || null,
+      user_city: user.profile?.city || user.city || '',
+      user_age: user.profile?.age || user.age || null,
+      user_gender: user.gender || user.profile?.gender || 'other',
+      user_experience: user.travel_experience || user.travelExperience || user.profile?.travelExperience || 'intermediate',
+      user_hobbies: user.hobbies || user.interests?.hobbies || [],
+      user_music: user.music || user.interests?.music || [],
+      user_bio: user.profile?.bio || '',
+    });
     setShowForm(false);
   };
 
