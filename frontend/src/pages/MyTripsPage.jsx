@@ -8,6 +8,7 @@ export default function MyTripsPage() {
   const { user } = useAuth();
   const { getUserTrips, addTrip, updateTrip, deleteTrip } = useTrips();
   const [showForm, setShowForm] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const myTrips = getUserTrips(user?.id);
 
@@ -116,9 +117,24 @@ export default function MyTripsPage() {
                 <div className="trips-page__trip-actions">
                   <button
                     className="btn btn--sm btn--outline"
-                    onClick={() => deleteTrip(trip.id)}
+                    onClick={async () => {
+                      if (deletingId) return;
+                      setDeletingId(trip.id);
+                      try {
+                        await deleteTrip(trip.id);
+                      } finally {
+                        setDeletingId(null);
+                      }
+                    }}
+                    disabled={deletingId === trip.id}
+                    style={{
+                      color: '#EF4444',
+                      borderColor: '#FCA5A5',
+                      opacity: deletingId === trip.id ? 0.6 : 1,
+                      cursor: deletingId === trip.id ? 'not-allowed' : 'pointer'
+                    }}
                   >
-                    Delete
+                    {deletingId === trip.id ? 'Deleting...' : '🗑️ Delete Trip'}
                   </button>
                 </div>
               </div>

@@ -179,11 +179,9 @@ export function TripProvider({ children }) {
     }
   }, [loadTrips, useSupabase]);
 
-  // Persist locally whenever trips change
+  // Persist locally whenever trips change (even when empty)
   useEffect(() => {
-    if (trips.length > 0) {
-      saveStoredTrips(trips);
-    }
+    saveStoredTrips(trips);
   }, [trips]);
 
   const addTrip = useCallback(async (trip) => {
@@ -315,20 +313,51 @@ export function TripProvider({ children }) {
   }, [useSupabase, trips]);
 
   const deleteTrip = useCallback(async (tripId) => {
+    if (!tripId) return;
+
+    // Find the trip object before removing
+    const tripToDelete = trips.find(t => t.id === tripId);
+    const dest = tripToDelete?.destination;
+    const uId = tripToDelete?.user_id || tripToDelete?.userId;
+
+    // 1. Immediately remove from local state and localStorage
+    setTrips(prev => {
+      const updated = prev.filter(t => {
+        if (t.id === tripId) return false;
+        // Also remove if matching destination and user
+        if (dest && (t.user_id === uId || t.userId === uId) && t.destination === dest) {
+          return false;
+        }
+        return true;
+      });
+      saveStoredTrips(updated);
+      return updated;
+    });
+
+    // 2. Remove from Supabase cloud
     if (useSupabase) {
       try {
-        await supabase.from('trips').delete().eq('id', tripId);
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(tripId));
+        if (isUUID) {
+          await supabase.from('trips').delete().eq('id', tripId);
+        }
+
+        // Also delete by user_id and destination to clean up any cloud duplicate
+        if (uId && dest) {
+          const isUserUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(uId));
+          if (isUserUUID) {
+            await supabase
+              .from('trips')
+              .delete()
+              .eq('user_id', uId)
+              .eq('destination', dest);
+          }
+        }
       } catch (err) {
         console.warn('Supabase trip delete error:', err);
       }
     }
-
-    setTrips(prev => {
-      const updated = prev.filter(t => t.id !== tripId);
-      saveStoredTrips(updated);
-      return updated;
-    });
-  }, [useSupabase]);
+  }, [useSupabase, trips]);
 
   const getUserTrips = useCallback((userId) => {
     if (!userId) return [];
