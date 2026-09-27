@@ -96,7 +96,7 @@ export default function ChatWindow({ conversation, onBack }) {
             )}
             <div className="chat-window__online-dot"></div>
           </div>
-          <div>
+          <div className="chat-window__buddy-info">
             <h4>{conversation.buddyName}</h4>
             <small className="chat-window__status">
               {isTyping ? (

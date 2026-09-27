@@ -1,61 +1,62 @@
-/* ─────────────────────────────────────────────
-   CHAT PAGE — Mobile-first, position fixed
-   Works on phones (≤900px) AND desktop (>900px)
-   ───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────
+   CHAT PAGE — Reliable viewport-filling layout
+   Uses padding-top to account for fixed navbar.
+   NO position:fixed on the page container itself.
+   ───────────────────────────────────────────────── */
 
-/* ── Base (Desktop) ── */
 .chat-page {
-  position: fixed;
-  top: 64px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--bg);
-  z-index: 10;
-  overflow: hidden;
+  padding-top: 64px;          /* navbar height */
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-}
-
-.chat-page__layout {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  flex: 1;
   overflow: hidden;
-  height: 100%;
+  background: var(--bg);
 }
 
+/* Desktop: side-by-side grid */
+.chat-page__layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 0;              /* critical: allows children to scroll */
+  overflow: hidden;
+}
+
+/* ── Sidebar (conversation list) ── */
 .chat-page__sidebar {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
+  border-right: 1.5px solid var(--border);
   overflow: hidden;
   background: #FFFFFF;
-  height: 100%;
+  min-height: 0;
 }
 
+/* ── Main chat area ── */
 .chat-page__main {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  position: relative;
-  background: var(--bg-soft);
-  height: 100%;
+  background: #F8FAFC;
+  min-height: 0;
 }
 
-/* ── Quick Start section ── */
+/* ── Quick-start section (new connections) ── */
 .chat-page__quick-start {
-  padding: 14px 16px;
+  padding: 16px;
   border-bottom: 1px solid var(--border);
   background: #FFFBEB;
   flex-shrink: 0;
 }
 
 .chat-page__quick-start h4 {
-  font-size: 0.82rem;
-  margin-bottom: 10px;
-  color: #92400E;
+  font-size: 0.78rem;
   font-weight: 600;
+  color: #92400E;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .chat-page__buddy-list {
@@ -67,40 +68,41 @@
 .chat-page__buddy-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 40px;
   background: #FFFFFF;
   border: 1.5px solid #FDE68A;
   color: #78350F;
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  transition: var(--transition);
-  box-shadow: 0 2px 8px rgba(245,158,11,0.1);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(245,158,11,0.08);
 }
 
 .chat-page__buddy-pill:hover {
   background: #FEF3C7;
   border-color: #F59E0B;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(245,158,11,0.2);
+  box-shadow: 0 6px 16px rgba(245,158,11,0.18);
 }
 
 .chat-page__buddy-dot {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: #0F172A;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.78rem;
+  font-weight: 800;
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
-/* ── Tap hint (when no conversations yet) ── */
+/* ── Tap hint (no conversations yet) ── */
 .chat-page__tap-hint {
   flex: 1;
   display: flex;
@@ -108,65 +110,74 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 40px 20px;
+  padding: 32px 20px;
   text-align: center;
 }
 
 .chat-page__tap-hint span {
   font-size: 2.5rem;
-  animation: float 3s ease-in-out infinite;
 }
 
 .chat-page__tap-hint p {
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 500;
+  line-height: 1.5;
 }
 
-/* ── Empty overlay ── */
-.chat-page__empty-overlay {
-  position: absolute;
-  inset: 0;
+/* ── Empty state (no connections at all) ── */
+.chat-page__empty {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
-  z-index: 5;
+  padding: 40px 24px;
+  text-align: center;
 }
 
 .chat-page__empty-content {
-  text-align: center;
-  padding: 40px 24px;
+  max-width: 340px;
 }
 
 .chat-page__empty-icon {
   font-size: 4rem;
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  line-height: 1;
 }
 
-/* ── Mobile/Tablet (≤900px): single-view drill-down ── */
+.chat-page__empty-content h2 {
+  font-size: 1.5rem;
+  color: var(--dark);
+  margin-bottom: 10px;
+}
+
+.chat-page__empty-content p {
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  font-size: 0.95rem;
+}
+
+/* ── Mobile / Tablet (≤ 900px): single-panel drill-down ── */
 @media (max-width: 900px) {
   .chat-page {
-    top: 56px;
+    padding-top: 56px;
   }
 
   .chat-page__layout {
     display: flex;
     flex-direction: column;
     height: 100%;
-    width: 100%;
-    overflow: hidden;
   }
 
-  /* Sidebar: always hidden on mobile unless .show */
+  /* Sidebar: full screen, shown first */
   .chat-page__sidebar {
     width: 100%;
-    height: 100%;
-    border-right: none;
+    flex: 1;
     display: none;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    min-height: 0;
   }
 
   .chat-page__sidebar.show {
@@ -174,13 +185,12 @@
     flex-direction: column;
   }
 
-  /* Main chat: always hidden on mobile unless .show */
+  /* Main: full screen, shown after selecting */
   .chat-page__main {
     width: 100%;
-    height: 100%;
+    flex: 1;
     display: none;
-    flex-direction: column;
-    overflow: hidden;
+    min-height: 0;
   }
 
   .chat-page__main.show {

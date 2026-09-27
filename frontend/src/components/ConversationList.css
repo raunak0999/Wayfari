@@ -2,31 +2,39 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: transparent;
+  background: #FFFFFF;
+  overflow: hidden;
+  min-height: 0;
 }
 
+/* ── Header ── */
 .convo-list__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 18px 20px 14px;
+  border-bottom: 1.5px solid var(--border);
+  flex-shrink: 0;
 }
 
 .convo-list__header h3 {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.02em;
 }
 
 .convo-list__count {
-  background: rgba(255, 107, 44, 0.1);
-  color: var(--primary-light);
+  background: #0F172A;
+  color: #FFC82C;
   font-weight: 700;
-  font-size: 0.8rem;
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 107, 44, 0.2);
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 20px;
 }
 
+/* ── Empty State ── */
 .convo-list__empty {
   flex: 1;
   display: flex;
@@ -36,50 +44,67 @@
   padding: 40px 20px;
   text-align: center;
   color: var(--text-muted);
+  gap: 8px;
 }
 
 .convo-list__empty span {
-  font-size: 3rem;
-  margin-bottom: 12px;
+  font-size: 2.8rem;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.convo-list__empty p {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .convo-list__empty small {
-  font-size: 0.82rem;
-  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
+/* ── Scrollable Items ── */
 .convo-list__items {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
+.convo-list__items::-webkit-scrollbar { width: 4px; }
+.convo-list__items::-webkit-scrollbar-track { background: transparent; }
+.convo-list__items::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
+
+/* ── Conversation Item ── */
 .convo-list__item {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 14px 12px;
-  border-radius: var(--radius);
-  transition: var(--transition);
+  padding: 12px;
+  border-radius: 14px;
+  transition: all 0.18s ease;
   text-align: left;
   background: none;
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   cursor: pointer;
   color: var(--text);
+  margin-bottom: 2px;
 }
 
 .convo-list__item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #F8FAFC;
   border-color: var(--border);
 }
 
 .convo-list__item.active {
-  background: rgba(255, 107, 44, 0.08);
-  border-color: rgba(255, 107, 44, 0.2);
-  box-shadow: 0 0 12px rgba(255, 107, 44, 0.05);
+  background: #FFFBEB;
+  border-color: #FDE68A;
 }
 
+/* ── Avatar ── */
 .convo-list__avatar {
   width: 48px;
   height: 48px;
@@ -89,14 +114,14 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 10px rgba(15, 23, 42, 0.15);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 
 .convo-list__avatar span {
   color: white;
-  font-weight: 700;
+  font-weight: 800;
   font-family: 'Outfit', sans-serif;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .convo-list__avatar img {
@@ -106,6 +131,7 @@
   object-fit: cover;
 }
 
+/* ── Item Info ── */
 .convo-list__info {
   flex: 1;
   min-width: 0;
@@ -119,15 +145,20 @@
 }
 
 .convo-list__top strong {
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-family: 'Outfit', sans-serif;
-  color: var(--text);
+  font-weight: 700;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .convo-list__top small {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .convo-list__bottom {
@@ -137,7 +168,7 @@
 }
 
 .convo-list__preview {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-muted) !important;
   white-space: nowrap;
   overflow: hidden;
@@ -146,18 +177,18 @@
   margin-right: 8px;
 }
 
+/* ── Unread Badge ── */
 .convo-list__badge {
   background: #FFC82C;
   color: #0F172A;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   min-width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   padding: 0 5px;
-  box-shadow: 0 0 10px rgba(255, 107, 44, 0.3);
 }

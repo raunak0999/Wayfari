@@ -9,14 +9,21 @@ import './ChatPage.css';
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const { conversations, setActiveConvoId, loadMessages, getOrCreateConversation } = useChat();
+  const {
+    conversations,
+    setActiveConvoId,
+    loadMessages,
+    getOrCreateConversation,
+  } = useChat();
   const { getAcceptedConnections } = useBuddies();
+
   const [activeConvo, setActiveConvo] = useState(null);
+  // Mobile: show sidebar first; Desktop: both always visible
   const [showSidebar, setShowSidebar] = useState(true);
 
-  const accepted = getAcceptedConnections(user?.id);
+  const accepted = getAcceptedConnections(user?.id) || [];
 
-  // Auto-select first conversation on desktop if none selected
+  // Auto-open first conversation on desktop
   useEffect(() => {
     const isMobile = window.innerWidth <= 900;
     if (!activeConvo && conversations.length > 0 && !isMobile) {
@@ -24,9 +31,10 @@ export default function ChatPage() {
       setActiveConvo(first);
       setActiveConvoId(first.id);
     }
-  }, [conversations, activeConvo, setActiveConvoId]);
+  }, [conversations]); // eslint-disable-line
 
   const handleInitConvo = async (buddy) => {
+    if (!buddy || !user) return;
     const convo = await getOrCreateConversation(
       user.id,
       buddy.id,
@@ -50,65 +58,74 @@ export default function ChatPage() {
 
   const handleBack = () => {
     setShowSidebar(true);
-    setActiveConvo(null);
   };
 
-  // Buddies with accepted connections but no conversation yet
-  const buddiesWithoutConvo = accepted.filter(buddy => {
+  // Accepted buddies without an existing conversation
+  const buddiesWithoutConvo = accepted.filter((buddy) => {
     if (!buddy) return false;
-    return !conversations.find(c =>
-      c.participant_1 === buddy.id || c.participant_2 === buddy.id ||
-      c.id?.includes(buddy.id)
+    return !conversations.some(
+      (c) =>
+        c.participant_1 === buddy.id ||
+        c.participant_2 === buddy.id ||
+        (c.id && c.id.includes(buddy.id))
     );
   });
 
-  const hasAnything = accepted.length > 0 || conversations.length > 0;
+  const hasConnections = accepted.length > 0 || conversations.length > 0;
 
-  // If nothing at all — show empty overlay
-  if (!hasAnything) {
+  // ─── Empty state — no connections yet ────────────────
+  if (!hasConnections) {
     return (
-      <div className="chat-page" id="chat-page">
-        <div className="chat-page__empty-overlay">
+      <div className="chat-page">
+        <div className="chat-page__empty">
           <div className="chat-page__empty-content">
-            <span className="chat-page__empty-icon">🤝</span>
-            <h2>No Connections Yet</h2>
-            <p>Find and connect with travel buddies to start chatting!</p>
-            <Link to="/find-buddies" className="btn btn--primary btn--lg">Find Buddies →</Link>
+            <span className="chat-page__empty-icon">✈️</span>
+            <h2>No Travel Buddies Yet</h2>
+            <p>
+              Connect with travelers heading to your dream destination and
+              start planning together!
+            </p>
+            <Link to="/find-buddies" className="btn btn--primary btn--lg">
+              Find Your Buddy →
+            </Link>
           </div>
         </div>
       </div>
     );
   }
 
+  // ─── Main layout ─────────────────────────────────────
   return (
-    <div className="chat-page" id="chat-page">
+    <div className="chat-page">
       <div className="chat-page__layout">
-        {/* Sidebar — conversation list */}
+        {/* ── Sidebar ── */}
         <div className={`chat-page__sidebar ${showSidebar ? 'show' : ''}`}>
-          {/* Accepted connections that haven't started chatting yet */}
+          {/* New connections that haven't chatted yet */}
           {buddiesWithoutConvo.length > 0 && (
             <div className="chat-page__quick-start">
-              <h4>✨ Start chatting with your matches:</h4>
+              <h4>✨ New Matches — Start Chatting</h4>
               <div className="chat-page__buddy-list">
-                {buddiesWithoutConvo.map(buddy => (
+                {buddiesWithoutConvo.map((buddy) => (
                   <button
                     key={buddy.id}
                     className="chat-page__buddy-pill"
                     onClick={() => handleInitConvo(buddy)}
                   >
-                    <span className="chat-page__buddy-dot">{buddy.name[0]}</span>
-                    {buddy.name.split(' ')[0]}
+                    <span className="chat-page__buddy-dot">
+                      {buddy.name?.[0] || '?'}
+                    </span>
+                    {buddy.name?.split(' ')[0] || 'Buddy'}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Existing conversations */}
-          {conversations.length === 0 && buddiesWithoutConvo.length > 0 ? (
+          {/* Conversation list OR first-chat hint */}
+          {conversations.length === 0 ? (
             <div className="chat-page__tap-hint">
               <span>👆</span>
-              <p>Tap a name above to start your first chat!</p>
+              <p>Tap a buddy above to start your first conversation!</p>
             </div>
           ) : (
             <ConversationList
@@ -118,7 +135,7 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Chat window — shows after selecting a conversation */}
+        {/* ── Chat window ── */}
         <div className={`chat-page__main ${!showSidebar ? 'show' : ''}`}>
           <ChatWindow conversation={activeConvo} onBack={handleBack} />
         </div>

@@ -1,15 +1,32 @@
 .buddy-card {
   position: relative;
   cursor: pointer;
-  padding: 26px;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease;
-  transform-style: preserve-3d;
+  padding: 24px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: #FFFFFF;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform;
+  overflow: hidden;
 }
 
-/* Override default card hover — 3D tilt handles it */
-.buddy-card.card:hover {
-  transform: none;
+.buddy-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: #FFC82C;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.buddy-card:hover::before { transform: scaleX(1); }
+
+.buddy-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
+  border-color: rgba(15, 23, 42, 0.15);
 }
 
 /* Shine overlay */
@@ -17,36 +34,35 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(255, 255, 255, 0.02);
   pointer-events: none;
   z-index: 1;
-  opacity: 0;
-  transition: var(--transition);
 }
 
-.buddy-card:hover .buddy-card__shine { opacity: 1; }
-
+/* ── Safety Badge ── */
 .buddy-card__safety-badge {
   position: absolute;
   top: 16px; right: 16px;
-  font-size: 1.2rem;
-  width: 38px; height: 38px;
+  font-size: 1rem;
+  width: 36px; height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 107, 44, 0.08);
-  border: 1px solid rgba(255, 107, 44, 0.15);
+  background: #FFF7ED;
+  border: 1.5px solid #FED7AA;
   border-radius: 50%;
   z-index: 2;
-  transition: var(--transition);
+  transition: all 0.2s ease;
 }
 
 .buddy-card:hover .buddy-card__safety-badge {
-  box-shadow: 0 0 16px rgba(255, 107, 44, 0.2);
+  background: #FF6B4A;
+  border-color: #FF6B4A;
+  transform: scale(1.1);
 }
 
+/* ── Compatibility Badge ── */
 .buddy-card__compat {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   position: relative;
   z-index: 2;
 }
@@ -55,51 +71,52 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--dark);
-  color: #FFFFFF;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #0F172A;
+  color: #FFC82C;
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  font-size: 0.82rem;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
-  border: 1px solid #1E293B;
+  font-size: 0.78rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
 
+/* ── Header ── */
 .buddy-card__header {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   position: relative;
   z-index: 2;
 }
 
 .buddy-card__avatar {
-  width: 58px; height: 58px;
+  width: 56px; height: 56px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 18px rgba(6, 182, 212, 0.25);
-  border: 2px solid #FFFFFF;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border: 2.5px solid #FFFFFF;
   position: relative;
-  transition: var(--transition);
+  transition: all 0.3s ease;
+  background: #0F172A;
 }
 
 .buddy-card:hover .buddy-card__avatar {
   transform: scale(1.08);
-  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
 }
 
 .buddy-card__avatar-ring {
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 2px solid #06B6D4;
+  border: 2px solid #FFC82C;
   opacity: 0;
-  transition: var(--transition);
+  transition: all 0.3s ease;
 }
 
 .buddy-card:hover .buddy-card__avatar-ring { opacity: 1; }
@@ -108,7 +125,7 @@
   color: white;
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
 }
 
 .buddy-card__avatar img {
@@ -118,35 +135,35 @@
 }
 
 .buddy-card__name {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--dark);
-  margin-bottom: 2px;
-  position: relative;
-  z-index: 2;
+  margin-bottom: 3px;
+  font-family: 'Outfit', sans-serif;
 }
 
 .buddy-card__meta {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-size: 0.82rem;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
+/* ── Destination ── */
 .buddy-card__destination {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 16px;
+  padding: 10px 14px;
   background: #FFFBEB;
   border: 1.5px solid #FDE68A;
-  border-radius: var(--radius);
+  border-radius: 12px;
   margin-bottom: 14px;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #92400E;
   position: relative;
   z-index: 2;
-  transition: var(--transition);
+  transition: all 0.2s ease;
 }
 
 .buddy-card:hover .buddy-card__destination {
@@ -154,8 +171,9 @@
   border-color: #F59E0B;
 }
 
-.buddy-card__dest-icon { font-size: 1.1rem; }
+.buddy-card__dest-icon { font-size: 1rem; flex-shrink: 0; }
 
+/* ── Chips ── */
 .buddy-card__chips {
   display: flex;
   flex-wrap: wrap;
@@ -166,27 +184,31 @@
 }
 
 .buddy-card__hobby {
-  font-size: 0.78rem !important;
-  padding: 5px 14px !important;
+  font-size: 0.75rem !important;
+  padding: 4px 12px !important;
   background: #F1F5F9 !important;
-  color: var(--dark) !important;
-  border: 1px solid #CBD5E1 !important;
+  color: #475569 !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 20px !important;
+  font-weight: 600 !important;
 }
 
+/* ── Music ── */
 .buddy-card__music {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-size: 0.82rem;
+  color: var(--text-muted);
   margin-bottom: 16px;
   position: relative;
   z-index: 2;
   font-weight: 500;
 }
 
-.buddy-card__music-icon { font-size: 1rem; }
+.buddy-card__music-icon { font-size: 0.9rem; }
 
+/* ── Actions ── */
 .buddy-card__actions {
   padding-top: 16px;
   border-top: 1.5px solid var(--border);
@@ -196,26 +218,19 @@
 
 .buddy-card__btn {
   width: 100%;
-  transition: var(--transition);
+  transition: all 0.2s ease;
+  border-radius: 12px !important;
+  padding: 11px !important;
+  font-weight: 700 !important;
 }
 
-.buddy-card__btn:hover {
-  transform: translateY(-2px) scale(1.02);
+.buddy-card__btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 200, 44, 0.3);
 }
 
 @media (max-width: 480px) {
-  .buddy-card {
-    padding: 18px;
-  }
-  .buddy-card__avatar {
-    width: 48px;
-    height: 48px;
-  }
-  .buddy-card__name {
-    font-size: 1.05rem;
-  }
-  .buddy-card__destination {
-    padding: 9px 12px;
-    font-size: 0.84rem;
-  }
+  .buddy-card { padding: 18px; }
+  .buddy-card__avatar { width: 48px; height: 48px; }
+  .buddy-card__name { font-size: 1rem; }
 }
