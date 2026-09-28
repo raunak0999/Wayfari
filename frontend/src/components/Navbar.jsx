@@ -13,12 +13,8 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Safely get unread count (ChatContext may not be available on landing page)
-  let totalUnread = 0;
-  try {
-    const { getTotalUnread } = useChat();
-    totalUnread = getTotalUnread();
-  } catch { /* not in provider */ }
+  const { getTotalUnread } = useChat();
+  const totalUnread = getTotalUnread ? getTotalUnread() : 0;
 
   // Scroll-aware state & progress bar
   useEffect(() => {

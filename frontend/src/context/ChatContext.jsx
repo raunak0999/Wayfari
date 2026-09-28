@@ -17,6 +17,51 @@ const getStoredMessages = () => {
   catch { return {}; }
 };
 
+const getContextualResponse = (userText, buddyName) => {
+  const lower = userText.toLowerCase();
+
+  if (lower.includes('hi') || lower.includes('hello') || lower.includes('hey')) {
+    const greetings = [
+      `Hey there! 😊 So glad we matched! I'm ${buddyName}. Ready to plan an adventure?`,
+      `Hello! 👋 Super excited to connect. What kind of trip are you thinking?`,
+      `Hi! Great to meet you! I've been looking for a travel buddy. Where should we go? 🌍`,
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+
+  if (lower.includes('when') || lower.includes('date') || lower.includes('schedule')) {
+    return "I'm pretty flexible with dates! I was thinking sometime next month. When works best for you? 📅";
+  }
+
+  if (lower.includes('budget') || lower.includes('cost') || lower.includes('money') || lower.includes('expensive')) {
+    return "Great question! I think we should set a budget range. I usually spend around $50-100/day depending on the destination. What's your comfort zone? 💰";
+  }
+
+  if (lower.includes('food') || lower.includes('eat') || lower.includes('restaurant')) {
+    return "Oh I LOVE trying local food! 🍜 We should definitely make a food bucket list for our trip. Street food tours are the best!";
+  }
+
+  if (lower.includes('hotel') || lower.includes('stay') || lower.includes('hostel') || lower.includes('accommodation')) {
+    return "I usually go with hostels or Airbnbs — better for meeting people and saving money! But I'm open to whatever you prefer 🏨";
+  }
+
+  if (lower.includes('flight') || lower.includes('plane') || lower.includes('fly')) {
+    return "I'll start looking at flights! Have you tried Google Flights? They usually have the best deals. Let me know your departure city 🛫";
+  }
+
+  const generalResponses = [
+    "That sounds amazing! I'd love to explore that! 🌍",
+    "Great idea! Let's start planning the details ✈️",
+    "I've been wanting to do something like this! Let's make it happen 🗺️",
+    "Awesome! Count me in! This is going to be epic 🎉",
+    "Perfect timing, I have vacation days coming up! Let's lock in the dates 📝",
+    "So excited about this! Should we create a shared itinerary? 📋",
+    `That's one of my dream plans! Let's do this, ${buddyName.split(' ')[0]} is ready! 😍`,
+    "Have you been there before? I'd love any tips you have! 🤔",
+  ];
+  return generalResponses[Math.floor(Math.random() * generalResponses.length)];
+};
+
 export function ChatProvider({ children }) {
   const [conversations, setConversations] = useState(getStoredConvos);
   const [messages, setMessages] = useState(getStoredMessages);
@@ -72,7 +117,7 @@ export function ChatProvider({ children }) {
         console.warn('Supabase loadConversations error:', err);
       }
     }
-    const localConvos = getStoredConvos();
+    const localConvos = getStoredConvos().filter(c => !String(c.lastMessage || '').startsWith(TRIP_SYNC_PREFIX));
     const dbIds = new Set(dbConvos.map(c => c.id));
     const extraLocal = localConvos.filter(c => !dbIds.has(c.id));
     const merged = [...dbConvos, ...extraLocal];
@@ -134,9 +179,22 @@ export function ChatProvider({ children }) {
               timestamp: payload.new.created_at,
             };
             setMessages(prev => {
+              const existingList = prev[newMsg.conversation_id] || [];
+              if (existingList.some(m => m.id === newMsg.id)) {
+                return prev;
+              }
+              // Replace matching optimistic message if already added locally
+              const optIdx = existingList.findIndex(m =>
+                String(m.id).startsWith('msg_') &&
+                m.senderId === newMsg.senderId &&
+                m.text === newMsg.text
+              );
+              const nextList = optIdx !== -1
+                ? existingList.map((m, idx) => idx === optIdx ? { ...newMsg, status: m.status || 'delivered' } : m)
+                : [...existingList, newMsg];
               const updated = {
                 ...prev,
-                [newMsg.conversation_id]: [...(prev[newMsg.conversation_id] || []), newMsg]
+                [newMsg.conversation_id]: nextList,
               };
               saveMsgs(updated);
               return updated;
@@ -179,23 +237,21 @@ export function ChatProvider({ children }) {
     if (useSupabase && !String(buddyId).startsWith('seed_') && !String(buddyId).startsWith('local_') && !String(buddyId).startsWith('user_')) {
       const [p1, p2] = [userId, buddyId].sort();
       try {
-        const { data: existingDb } = await supabase
+        const { data: existingDbList } = await supabase
           .from('conversations')
           .select('*')
-          .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`)
-          .maybeSingle();
+          .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`);
 
-        if (existingDb?.id) {
-          convoId = existingDb.id;
+        if (existingDbList && existingDbList.length > 0) {
+          convoId = existingDbList[0].id;
         } else {
-          const { data } = await supabase
+          const { data: createdList } = await supabase
             .from('conversations')
             .insert({ participant_1: p1, participant_2: p2, last_message: '' })
-            .select()
-            .maybeSingle();
+            .select();
 
-          if (data?.id) {
-            convoId = data.id;
+          if (createdList && createdList.length > 0) {
+            convoId = createdList[0].id;
           }
         }
       } catch { /* ignore */ }
@@ -219,71 +275,7 @@ export function ChatProvider({ children }) {
     return newConvo;
   }, [conversations, useSupabase]);
 
-  // ── Send Message ──
-  const sendMessage = useCallback(async (convoId, senderId, text) => {
-    const convo = conversations.find(c => c.id === convoId);
-    const buddyName = convo?.buddyName || 'Buddy';
-
-    const msg = {
-      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-      senderId: senderId,
-      sender_id: senderId,
-      text,
-      timestamp: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      read: false,
-      conversation_id: convoId,
-      status: 'sent',
-    };
-
-    setMessages(prev => {
-      const updated = { ...prev, [convoId]: [...(prev[convoId] || []), msg] };
-      if (!useSupabase) saveMsgs(updated);
-      return updated;
-    });
-
-    setConversations(prev => {
-      const updated = prev.map(c =>
-        c.id === convoId
-          ? { ...c, lastMessage: text, lastMessageTime: msg.timestamp }
-          : c
-      );
-      if (!useSupabase) saveConvos(updated);
-      return updated;
-    });
-
-    if (useSupabase && !convoId.includes('seed_') && !convoId.includes('local_')) {
-      await supabase.from('messages').insert({
-        conversation_id: convoId,
-        sender_id: senderId,
-        text,
-      });
-
-      await supabase.from('conversations').update({
-        last_message: text,
-        last_message_time: new Date().toISOString(),
-      }).eq('id', convoId);
-    }
-
-    setTimeout(() => {
-      setMessages(prev => {
-        const updated = {
-          ...prev,
-          [convoId]: (prev[convoId] || []).map(m =>
-            m.id === msg.id ? { ...m, status: 'delivered' } : m
-          )
-        };
-        if (!useSupabase) saveMsgs(updated);
-        return updated;
-      });
-    }, 800);
-
-    simulateBuddyResponse(convoId, senderId, buddyName, text);
-
-    return msg;
-  }, [conversations, useSupabase, saveMsgs, saveConvos]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const simulateBuddyResponse = (convoId, senderId, buddyName, userText) => {
+  const simulateBuddyResponse = useCallback((convoId, buddyName, userText) => {
     const contextResponses = getContextualResponse(userText, buddyName);
 
     setTypingUsers(prev => ({ ...prev, [convoId]: true }));
@@ -309,7 +301,7 @@ export function ChatProvider({ children }) {
           ...prev,
           [convoId]: [...(prev[convoId] || []), buddyMsg]
         };
-        if (!useSupabase) saveMsgs(updated);
+        saveMsgs(updated);
         return updated;
       });
 
@@ -325,66 +317,86 @@ export function ChatProvider({ children }) {
               }
             : c
         );
-        if (!useSupabase) saveConvos(updated);
+        saveConvos(updated);
         return updated;
       });
     }, delay);
-  };
+  }, [saveMsgs, saveConvos]);
 
-  const getContextualResponse = (userText, buddyName) => {
-    const lower = userText.toLowerCase();
+  // ── Send Message ──
+  const sendMessage = useCallback(async (convoId, senderId, text) => {
+    const convo = conversations.find(c => c.id === convoId);
+    const buddyName = convo?.buddyName || 'Buddy';
+    const nowIso = new Date().toISOString();
 
-    if (lower.includes('hi') || lower.includes('hello') || lower.includes('hey')) {
-      const greetings = [
-        `Hey there! 😊 So glad we matched! I'm ${buddyName}. Ready to plan an adventure?`,
-        `Hello! 👋 Super excited to connect. What kind of trip are you thinking?`,
-        `Hi! Great to meet you! I've been looking for a travel buddy. Where should we go? 🌍`,
-      ];
-      return greetings[Math.floor(Math.random() * greetings.length)];
+    const msg = {
+      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      senderId: senderId,
+      sender_id: senderId,
+      text,
+      timestamp: nowIso,
+      created_at: nowIso,
+      read: false,
+      conversation_id: convoId,
+      status: 'sent',
+    };
+
+    setMessages(prev => {
+      const updated = { ...prev, [convoId]: [...(prev[convoId] || []), msg] };
+      saveMsgs(updated);
+      return updated;
+    });
+
+    setConversations(prev => {
+      const updated = prev.map(c =>
+        c.id === convoId
+          ? { ...c, lastMessage: text, lastMessageTime: msg.timestamp }
+          : c
+      );
+      saveConvos(updated);
+      return updated;
+    });
+
+    if (useSupabase && !convoId.includes('seed_') && !convoId.includes('local_')) {
+      await supabase.from('conversations').update({
+        last_message: text,
+        last_message_time: nowIso,
+      }).eq('id', convoId);
+
+      await supabase.from('messages').insert({
+        conversation_id: convoId,
+        sender_id: senderId,
+        text,
+      });
     }
 
-    if (lower.includes('when') || lower.includes('date') || lower.includes('schedule')) {
-      return "I'm pretty flexible with dates! I was thinking sometime next month. When works best for you? 📅";
-    }
+    setTimeout(() => {
+      setMessages(prev => {
+        const updated = {
+          ...prev,
+          [convoId]: (prev[convoId] || []).map(m =>
+            m.id === msg.id ? { ...m, status: 'delivered' } : m
+          )
+        };
+        saveMsgs(updated);
+        return updated;
+      });
+    }, 800);
 
-    if (lower.includes('budget') || lower.includes('cost') || lower.includes('money') || lower.includes('expensive')) {
-      return "Great question! I think we should set a budget range. I usually spend around $50-100/day depending on the destination. What's your comfort zone? 💰";
-    }
+    simulateBuddyResponse(convoId, buddyName, text);
 
-    if (lower.includes('food') || lower.includes('eat') || lower.includes('restaurant')) {
-      return "Oh I LOVE trying local food! 🍜 We should definitely make a food bucket list for our trip. Street food tours are the best!";
-    }
-
-    if (lower.includes('hotel') || lower.includes('stay') || lower.includes('hostel') || lower.includes('accommodation')) {
-      return "I usually go with hostels or Airbnbs — better for meeting people and saving money! But I'm open to whatever you prefer 🏨";
-    }
-
-    if (lower.includes('flight') || lower.includes('plane') || lower.includes('fly')) {
-      return "I'll start looking at flights! Have you tried Google Flights? They usually have the best deals. Let me know your departure city 🛫";
-    }
-
-    const generalResponses = [
-      "That sounds amazing! I'd love to explore that! 🌍",
-      "Great idea! Let's start planning the details ✈️",
-      "I've been wanting to do something like this! Let's make it happen 🗺️",
-      "Awesome! Count me in! This is going to be epic 🎉",
-      "Perfect timing, I have vacation days coming up! Let's lock in the dates 📝",
-      "So excited about this! Should we create a shared itinerary? 📋",
-      `That's one of my dream plans! Let's do this, ${buddyName.split(' ')[0]} is ready! 😍`,
-      "Have you been there before? I'd love any tips you have! 🤔",
-    ];
-    return generalResponses[Math.floor(Math.random() * generalResponses.length)];
-  };
+    return msg;
+  }, [conversations, useSupabase, saveMsgs, saveConvos, simulateBuddyResponse]);
 
   const markAsRead = useCallback((convoId) => {
     setConversations(prev => {
       const updated = prev.map(c =>
         c.id === convoId ? { ...c, unreadCount: 0 } : c
       );
-      if (!useSupabase) saveConvos(updated);
+      saveConvos(updated);
       return updated;
     });
-  }, [useSupabase, saveConvos]);
+  }, [saveConvos]);
 
   const getMessages = useCallback((convoId) => {
     return messages[convoId] || [];

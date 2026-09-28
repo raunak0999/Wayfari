@@ -21,14 +21,18 @@ export default function SafetyHub() {
   const [coords, setCoords] = useState(null);
   const [checkIns, setCheckIns] = useState([]);
   const [sosTriggered, setSosTriggered] = useState(false);
-  const [sosTimer, setSosTimer] = useState(null);
-  const [sosProgress, setSosProgress] = useState(0);
   const [safetyContacts, setSafetyContacts] = useState([]);
   const [sosLog, setSosLog] = useState([]);
   const [toastMessage, setToastMessage] = useState('');
   const [checkInInterval, setCheckInInterval] = useState('2hr');
   const [nextCheckIn, setNextCheckIn] = useState(null);
   const [checkInCountdown, setCheckInCountdown] = useState('');
+
+  // ── Toast helper ──
+  const showToast = useCallback((msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 4000);
+  }, []);
 
   // ── Load data from localStorage ──
   useEffect(() => {
@@ -81,7 +85,7 @@ export default function SafetyHub() {
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [locationEnabled]);
+  }, [locationEnabled, showToast]);
 
   // ── Check-in Countdown Timer ──
   useEffect(() => {
@@ -115,13 +119,7 @@ export default function SafetyHub() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [checkIns, checkInInterval]);
-
-  // ── Toast helper ──
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 4000);
-  };
+  }, [checkIns, checkInInterval, showToast]);
 
   // ── Check-in ──
   const handleCheckIn = () => {
@@ -147,7 +145,6 @@ export default function SafetyHub() {
   const dispatchSOS = useCallback((lat, lng, fallbackCity) => {
     const locText = lat && lng ? `Lat: ${lat}, Lng: ${lng}` : (fallbackCity || 'Location unavailable');
     const mapsLink = lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : (fallbackCity ? `Location: ${fallbackCity}` : 'Location unavailable');
-    const message = `🚨 EMERGENCY SOS ALERT from Wayfari!\nI need immediate assistance!\nMy current location: ${mapsLink}`;
 
     // Log the SOS event
     const sosEntry = {
@@ -180,7 +177,7 @@ export default function SafetyHub() {
     }
 
     setTimeout(() => setSosTriggered(false), 8000);
-  }, [safetyContacts, user?.id]);
+  }, [safetyContacts, user, showToast]);
 
   const handleSOSClick = useCallback(() => {
     setSosTriggered(true);

@@ -8,7 +8,6 @@ import { BuddyProvider } from './context/BuddyContext';
 import ErrorBoundary from './components/ErrorBoundary';
 
 import Navbar from './components/Navbar';
-import CustomCursor from './components/CustomCursor';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import ProfileSetupPage from './pages/ProfileSetupPage';

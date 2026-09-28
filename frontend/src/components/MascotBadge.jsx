@@ -1,7 +1,6 @@
-import React from 'react';
 import './MascotBadge.css';
 
-export default function MascotBadge({ message = "Ready for your next trip?", mascotName = "Wayfarer Fox", emotion = "happy" }) {
+export default function MascotBadge({ message = "Ready for your next trip?" }) {
   return (
     <div className="mascot-badge animate-float">
       <div className="mascot-badge__speech">

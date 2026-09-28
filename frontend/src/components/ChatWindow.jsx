@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import './ChatWindow.css';
@@ -13,8 +13,9 @@ export default function ChatWindow({ conversation, onBack }) {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const messages = conversation ? getMessages(conversation.id) : [];
-  const isTyping = conversation ? typingUsers[conversation.id] : false;
+  const convoId = conversation?.id;
+  const messages = useMemo(() => (convoId ? getMessages(convoId) : []), [convoId, getMessages]);
+  const isTyping = convoId ? typingUsers[convoId] : false;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,9 +73,6 @@ export default function ChatWindow({ conversation, onBack }) {
     if (msg.status === 'sent') return '✓';
     return '✓';
   };
-
-  // Group messages by date
-  let lastDate = '';
 
   return (
     <div className="chat-window" id="chat-window">
@@ -134,11 +132,8 @@ export default function ChatWindow({ conversation, onBack }) {
 
         {messages.map((msg, idx) => {
           const msgDate = formatDateSeparator(msg.timestamp);
-          let showDate = false;
-          if (msgDate !== lastDate) {
-            lastDate = msgDate;
-            showDate = true;
-          }
+          const prevDate = idx > 0 ? formatDateSeparator(messages[idx - 1].timestamp) : '';
+          const showDate = msgDate !== prevDate;
 
           const isSent = msg.senderId === user.id;
 

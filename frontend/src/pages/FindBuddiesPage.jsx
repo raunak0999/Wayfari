@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBuddies } from '../context/BuddyContext';
@@ -45,15 +45,16 @@ export default function FindBuddiesPage() {
   const hasFilters = Object.values(filters).some(v => Boolean(v && String(v).trim()));
 
   // Helper: check if a trip belongs to the currently logged-in user
-  const isOwnTrip = (b) => {
+  const isOwnTrip = useCallback((b) => {
     if (!user) return false;
     const bUid = b.userId || b.user_id;
     if (bUid && bUid === user.id) return true;
     if (String(bUid).startsWith('local_') || String(bUid).startsWith('user_')) {
-      return String(user.id).startsWith('local_') || !b.user_name || b.user_name === user.name;
+      const bName = b.name || b.user_name;
+      return String(user.id).startsWith('local_') || !bName || bName === user.name;
     }
     return false;
-  };
+  }, [user]);
 
   // Find Buddies should ONLY show OTHER travelers' posts (sorted newest-first)
   // A user's own trips belong exclusively in the "My Trips" section
@@ -64,7 +65,7 @@ export default function FindBuddiesPage() {
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return timeB - timeA;
     });
-  }, [buddies, user]);
+  }, [buddies, user, isOwnTrip]);
 
   const filtered = useMemo(() => {
     if (hasFilters) {
@@ -74,7 +75,7 @@ export default function FindBuddiesPage() {
     }
     // Default live feed: show ONLY the 10 most recently posted trips across the website
     return otherBuddies.slice(0, 10);
-  }, [hasFilters, filters, searchBuddies, otherBuddies, user]);
+  }, [hasFilters, filters, searchBuddies, otherBuddies, user, isOwnTrip]);
 
   // Sort results
   const results = useMemo(() => {

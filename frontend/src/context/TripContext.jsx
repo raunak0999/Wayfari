@@ -76,6 +76,28 @@ const makeDestDateKey = (destination, depDate) => {
   return `${cleanDest}_${cleanDep}`;
 };
 
+// Check whether a trip belongs to a given user without cross-account contamination of local_ trips
+const isTripOwnedByUser = (trip, userId, authUser = null) => {
+  if (!trip || !userId) return false;
+  const tUid = trip.user_id || trip.userId;
+  if (tUid === userId) return true;
+  if (isUUID(tUid) && tUid !== userId) return false;
+
+  if (!tUid || String(tUid).startsWith('local_') || String(tUid).startsWith('user_')) {
+    const localProfiles = getStoredLocalProfiles();
+    const knownName =
+      localProfiles[userId]?.name ||
+      authUser?.user_metadata?.full_name ||
+      authUser?.user_metadata?.name ||
+      null;
+    if (knownName && trip.user_name && trip.user_name !== 'Traveler') {
+      return trip.user_name.trim().toLowerCase() === knownName.trim().toLowerCase();
+    }
+    return true;
+  }
+  return false;
+};
+
 export function TripProvider({ children }) {
   const [trips, setTrips] = useState(getStoredTrips);
   const [loading, setLoading] = useState(false);
@@ -86,6 +108,9 @@ export function TripProvider({ children }) {
   const deletedTripsRef = useRef(getStoredDeletedTrips());
   const syncingRef = useRef(false);
   const lastSyncedSignatureRef = useRef('');
+  const lastRealtimeTrackedSigRef = useRef('');
+  const lastSyncedPeerCountRef = useRef(0);
+  const hasLoadedInitialTripsRef = useRef(false);
   const realtimeChannelRef = useRef(null);
   const currentUserIdRef = useRef(null);
 
@@ -359,24 +384,29 @@ export function TripProvider({ children }) {
     return null;
   }, [useSupabase]);
 
-  // Relay trips via `public.conversations` + `public.messages` (works across users even if `profiles` UPDATE and `trips` SELECT are blocked by RLS!)
-  const relayTripsToPeersViaMessages = useCallback(async (userId, compactTrips) => {
+  // Relay trips via `public.conversations` + `public.messages` (works across users even if `profiles` UPDATE and `trips` SELECT are blocked by RLS)
+  const relayTripsToPeersViaMessages = useCallback(async (userId, compactTrips, deletedKeys = []) => {
     if (!useSupabase || !isUUID(userId)) return;
     try {
       const { data: allProfs } = await supabase
         .from('profiles')
         .select('id')
-        .limit(30);
+        .limit(200);
 
       if (!allProfs || allProfs.length === 0) return;
       const peerIds = allProfs
         .map(p => p.id)
         .filter(pid => isUUID(pid) && pid !== userId);
 
+      lastSyncedPeerCountRef.current = peerIds.length;
+      const nowIso = new Date().toISOString();
+
       const syncText = TRIP_SYNC_PREFIX + JSON.stringify({
         user_id: userId,
         trips: compactTrips,
-        updated_at: new Date().toISOString(),
+        deleted_keys: deletedKeys,
+        explicitly_empty: compactTrips.length === 0,
+        updated_at: nowIso,
       });
 
       await Promise.all(peerIds.map(async (peerId) => {
@@ -384,21 +414,28 @@ export function TripProvider({ children }) {
           const [p1, p2] = [userId, peerId].sort();
           let convoId = null;
 
-          const { data: existingConvo } = await supabase
+          // Use .select() without .maybeSingle() so multiple rows never throw PGRST116
+          const { data: existingConvos } = await supabase
             .from('conversations')
-            .select('id')
-            .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`)
-            .maybeSingle();
+            .select('id, last_message')
+            .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`);
 
-          if (existingConvo?.id) {
-            convoId = existingConvo.id;
+          if (existingConvos && existingConvos.length > 0) {
+            convoId = existingConvos[0].id;
+            const currentLastMsg = String(existingConvos[0].last_message || '');
+            // If conversation has no real chat messages yet, also store syncText in last_message
+            if (!currentLastMsg.trim() || currentLastMsg.startsWith(TRIP_SYNC_PREFIX)) {
+              await supabase
+                .from('conversations')
+                .update({ last_message: syncText, last_message_time: null })
+                .eq('id', convoId);
+            }
           } else {
-            const { data: createdConvo } = await supabase
+            const { data: createdConvos } = await supabase
               .from('conversations')
-              .insert({ participant_1: p1, participant_2: p2, last_message: '' })
-              .select('id')
-              .maybeSingle();
-            convoId = createdConvo?.id || null;
+              .insert({ participant_1: p1, participant_2: p2, last_message: syncText })
+              .select('id');
+            convoId = createdConvos?.[0]?.id || null;
           }
 
           if (!convoId) return;
@@ -444,7 +481,7 @@ export function TripProvider({ children }) {
     }
   }, [useSupabase]);
 
-  // Sync a user's active trips across all 5 channels (`profiles`, `auth.users` metadata, `Realtime`, `messages` relay)
+  // Sync a user's active trips across all 5 channels (`profiles`, `auth.users` metadata, `Realtime`, `conversations`/`messages` relay)
   const syncTripsToProfile = useCallback(async (userId, allTripsList) => {
     if (!useSupabase || !isUUID(userId)) return;
 
@@ -457,13 +494,7 @@ export function TripProvider({ children }) {
 
       const userTrips = (allTripsList || []).filter(t => {
         if (!t || !t.destination || t.status === 'completed') return false;
-        const tUid = t.user_id || t.userId;
-        const belongsToUser =
-          tUid === userId ||
-          !tUid ||
-          String(tUid).startsWith('local_') ||
-          String(tUid).startsWith('user_');
-        if (!belongsToUser) return false;
+        if (!isTripOwnedByUser(t, userId, authUser)) return false;
         const dep = t.departure_date || t.departureDate || '';
         const ddKey = makeDestDateKey(t.destination, dep);
         if (deletedTripsRef.current.has(t.id) || deletedTripsRef.current.has(ddKey)) {
@@ -521,8 +552,9 @@ export function TripProvider({ children }) {
       const latest = uniqueTrips[0] || null;
       const rawDate = latest?.departure_date || null;
       const validDate = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(String(rawDate)) ? rawDate : null;
+      const deletedKeysList = Array.from(deletedTripsRef.current);
 
-      // Channel 1: Update `public.profiles` row
+      // Channel 1: Update `public.profiles` row (with upsert fallback if row missing)
       const profilePayload = {
         destination: latest ? latest.destination : null,
         departure_date: validDate,
@@ -532,17 +564,29 @@ export function TripProvider({ children }) {
         profile_complete: true,
       };
 
-      await supabase
+      const { data: updatedProf } = await supabase
         .from('profiles')
         .update(profilePayload)
         .eq('id', userId)
         .select();
 
+      if (!updatedProf || updatedProf.length === 0) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            name: latest?.user_name || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || 'Traveler',
+            email: authUser?.email || null,
+            gender: latest?.user_gender || 'other',
+            ...profilePayload,
+          }, { onConflict: 'id' });
+      }
+
       // Channel 2: Persist own trips in Supabase Auth `user_metadata` (always succeeds regardless of table RLS)
       supabase.auth.updateUser({
         data: {
           wayfari_trips: uniqueTrips,
-          wayfari_deleted_trips: Array.from(deletedTripsRef.current),
+          wayfari_deleted_trips: deletedKeysList,
         }
       }).catch(() => {});
 
@@ -551,8 +595,11 @@ export function TripProvider({ children }) {
         const realtimePayload = {
           user_id: userId,
           trips: uniqueTrips,
+          deleted_keys: deletedKeysList,
+          explicitly_empty: uniqueTrips.length === 0,
           updated_at: new Date().toISOString(),
         };
+        lastRealtimeTrackedSigRef.current = sig;
         realtimeChannelRef.current.track(realtimePayload).catch(() => {});
         realtimeChannelRef.current.send({
           type: 'broadcast',
@@ -562,26 +609,46 @@ export function TripProvider({ children }) {
       }
 
       // Channel 4: Relay via `public.conversations` + `public.messages` so peers receive trips even when offline
-      await relayTripsToPeersViaMessages(userId, uniqueTrips);
+      await relayTripsToPeersViaMessages(userId, uniqueTrips, deletedKeysList);
     } catch (err) {
       console.warn('syncTripsToProfile error:', err);
     }
   }, [useSupabase, enrichTripWithProfile, relayTripsToPeersViaMessages]);
 
-  // Apply incoming peer trips from Realtime or Messages relay into peerTripsRef and active trips state
-  const applyIncomingPeerTrips = useCallback((peerUserId, peerTripsArray, updatedAt) => {
+  // Apply incoming peer trips from Realtime or Messages/Conversations relay into peerTripsRef and active trips state
+  const applyIncomingPeerTrips = useCallback((peerUserId, peerTripsArray, updatedAt, peerDeletedKeys = [], explicitlyEmpty = false) => {
     if (!isUUID(peerUserId)) return;
     if (currentUserIdRef.current && peerUserId === currentUserIdRef.current) return;
 
+    const incomingList = Array.isArray(peerTripsArray) ? peerTripsArray : [];
+    const incomingDelKeys = Array.isArray(peerDeletedKeys) ? peerDeletedKeys : [];
+
+    // Guard against uninitialized empty Presence state wiping already-known peer trips
     const currentPeerEntry = peerTripsRef.current[peerUserId];
+    if (incomingList.length === 0 && !explicitlyEmpty && incomingDelKeys.length === 0) {
+      if (currentPeerEntry && Array.isArray(currentPeerEntry.trips) && currentPeerEntry.trips.length > 0) {
+        return;
+      }
+    }
+
     if (currentPeerEntry?.updated_at && updatedAt) {
       if (new Date(updatedAt).getTime() < new Date(currentPeerEntry.updated_at).getTime()) {
         return;
       }
     }
 
-    const normalizedPeerTrips = (Array.isArray(peerTripsArray) ? peerTripsArray : [])
-      .filter(t => t && t.destination && t.status !== 'completed')
+    const mergedDelKeys = Array.from(new Set([
+      ...(currentPeerEntry?.deleted_keys || []),
+      ...incomingDelKeys,
+    ]));
+    const delSet = new Set(mergedDelKeys);
+
+    const normalizedPeerTrips = incomingList
+      .filter(t => {
+        if (!t || !t.destination || t.status === 'completed') return false;
+        const dep = t.departure_date || t.departureDate || '';
+        return !delSet.has(t.id) && !delSet.has(makeDestDateKey(t.destination, dep));
+      })
       .map(t => enrichTripWithProfile({ ...t, user_id: peerUserId, userId: peerUserId }, peerUserId));
 
     peerTripsRef.current = {
@@ -589,6 +656,8 @@ export function TripProvider({ children }) {
       [peerUserId]: {
         updated_at: updatedAt || new Date().toISOString(),
         trips: normalizedPeerTrips,
+        deleted_keys: mergedDelKeys,
+        explicitly_empty: Boolean(explicitlyEmpty && normalizedPeerTrips.length === 0),
       }
     };
     saveStoredPeerTrips(peerTripsRef.current);
@@ -604,12 +673,16 @@ export function TripProvider({ children }) {
     setTripsAndPersist(combined);
   }, [enrichTripWithProfile, setTripsAndPersist]);
 
-  // Load all trips from Supabase (`profiles` + `trips` + `messages` relay + `auth` metadata + `peerTripsRef`) and auto-sync own trips
+  // Load all trips from Supabase (`profiles` + `trips` + `messages`/`conversations` relay + `auth` metadata + `peerTripsRef`) and auto-sync own trips
   const loadTrips = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     let cloudTrips = [];
     let currentAuthUserId = null;
     let currentAuthUser = null;
+    let profilesList = [];
+    const profilesById = {};
+    let dbTripsRows = [];
+    let profileExtractedTrips = [];
 
     if (useSupabase) {
       try {
@@ -637,8 +710,6 @@ export function TripProvider({ children }) {
       }
 
       // 1. Fetch all profiles (publicly readable across all users)
-      let profilesList = [];
-      const profilesById = {};
       try {
         const { data: profData, error: profErr } = await supabase
           .from('profiles')
@@ -654,7 +725,6 @@ export function TripProvider({ children }) {
       }
 
       // 2. Fetch from `trips` table if accessible
-      let dbTripsRows = [];
       try {
         let { data, error } = await supabase
           .from('trips')
@@ -678,9 +748,50 @@ export function TripProvider({ children }) {
       }
 
       // 3. Extract trips from all profiles
-      const profileExtractedTrips = profilesList.flatMap(p => parseProfileTrips(p, profilesById, currentAuthUser));
+      profileExtractedTrips = profilesList.flatMap(p => parseProfileTrips(p, profilesById, currentAuthUser));
 
-      // 4. Read cross-user trip sync messages from `public.messages`
+      // Helper to ingest a raw sync payload string from either `messages.text` or `conversations.last_message`
+      const ingestSyncText = (rawText, fallbackSenderId, fallbackTimestamp) => {
+        if (!rawText || !String(rawText).startsWith(TRIP_SYNC_PREFIX)) return;
+        try {
+          const rawJson = String(rawText).slice(TRIP_SYNC_PREFIX.length);
+          const parsed = JSON.parse(rawJson);
+          const senderId = parsed?.user_id || fallbackSenderId;
+          if (!isUUID(senderId) || senderId === currentAuthUserId) return;
+
+          const senderTrips = Array.isArray(parsed?.trips) ? parsed.trips : [];
+          const senderDelKeys = Array.isArray(parsed?.deleted_keys) ? parsed.deleted_keys : [];
+          const explicitlyEmpty = Boolean(parsed?.explicitly_empty);
+          const msgTime = parsed?.updated_at || fallbackTimestamp;
+
+          const existingEntry = peerTripsRef.current[senderId];
+          const isNewer = !existingEntry?.updated_at ||
+            !msgTime ||
+            new Date(msgTime).getTime() >= new Date(existingEntry.updated_at).getTime();
+
+          if (isNewer) {
+            const mergedDelKeys = Array.from(new Set([
+              ...(existingEntry?.deleted_keys || []),
+              ...senderDelKeys,
+            ]));
+            const delSet = new Set(mergedDelKeys);
+            peerTripsRef.current[senderId] = {
+              updated_at: msgTime || new Date().toISOString(),
+              deleted_keys: mergedDelKeys,
+              explicitly_empty: explicitlyEmpty && senderTrips.length === 0,
+              trips: senderTrips
+                .filter(st => {
+                  if (!st || !st.destination || st.status === 'completed') return false;
+                  const dep = st.departure_date || st.departureDate || '';
+                  return !delSet.has(st.id) && !delSet.has(makeDestDateKey(st.destination, dep));
+                })
+                .map(st => enrichTripWithProfile({ ...st, user_id: senderId, userId: senderId }, senderId, profilesById, currentAuthUser)),
+            };
+          }
+        } catch { /* ignore malformed sync payload */ }
+      };
+
+      // 4A. Read cross-user trip sync payloads from `public.messages`
       try {
         const { data: syncMsgs, error: msgErr } = await supabase
           .from('messages')
@@ -693,44 +804,36 @@ export function TripProvider({ children }) {
           for (const m of syncMsgs) {
             if (!m.sender_id || seenSenders.has(m.sender_id)) continue;
             seenSenders.add(m.sender_id);
-            if (m.sender_id === currentAuthUserId) continue;
-
-            try {
-              const rawJson = String(m.text).slice(TRIP_SYNC_PREFIX.length);
-              const parsed = JSON.parse(rawJson);
-              const senderTrips = Array.isArray(parsed?.trips) ? parsed.trips : [];
-              const msgTime = parsed?.updated_at || m.created_at;
-
-              const existingEntry = peerTripsRef.current[m.sender_id];
-              const isNewer = !existingEntry?.updated_at ||
-                !msgTime ||
-                new Date(msgTime).getTime() >= new Date(existingEntry.updated_at).getTime();
-
-              if (isNewer) {
-                peerTripsRef.current[m.sender_id] = {
-                  updated_at: msgTime || new Date().toISOString(),
-                  trips: senderTrips.map(st => enrichTripWithProfile({ ...st, user_id: m.sender_id, userId: m.sender_id }, m.sender_id, profilesById, currentAuthUser)),
-                };
-              }
-            } catch { /* ignore malformed sync msg */ }
+            ingestSyncText(m.text, m.sender_id, m.created_at);
           }
-          saveStoredPeerTrips(peerTripsRef.current);
         }
       } catch { /* ignore if messages table unavailable */ }
 
-      // 5. Gather peer trips from peerTripsRef (populated by messages relay + Realtime Presence/Broadcast)
+      // 4B. Read cross-user trip sync payloads from `public.conversations` (`last_message`)
+      try {
+        const { data: syncConvos, error: convoErr } = await supabase
+          .from('conversations')
+          .select('participant_1, participant_2, last_message, last_message_time, created_at')
+          .like('last_message', `${TRIP_SYNC_PREFIX}%`);
+
+        if (!convoErr && syncConvos && syncConvos.length > 0) {
+          for (const c of syncConvos) {
+            const peerSender = c.participant_1 === currentAuthUserId ? c.participant_2 : c.participant_1;
+            ingestSyncText(c.last_message, peerSender, c.last_message_time || c.created_at);
+          }
+        }
+      } catch { /* ignore if conversations table unavailable */ }
+
+      saveStoredPeerTrips(peerTripsRef.current);
+
+      // 5. Gather peer trips from peerTripsRef (populated by messages/conversations relay + Realtime Presence/Broadcast)
       const peerRelayTrips = [];
-      const explicitlyClearedPeers = new Set();
       for (const [peerUid, entry] of Object.entries(peerTripsRef.current || {})) {
         if (peerUid === currentAuthUserId) continue;
         if (entry && Array.isArray(entry.trips)) {
-          if (entry.trips.length === 0) {
-            explicitlyClearedPeers.add(peerUid);
-          } else {
-            for (const pt of entry.trips) {
-              if (pt && pt.destination && pt.status !== 'completed') {
-                peerRelayTrips.push(enrichTripWithProfile(pt, peerUid, profilesById, currentAuthUser));
-              }
+          for (const pt of entry.trips) {
+            if (pt && pt.destination && pt.status !== 'completed') {
+              peerRelayTrips.push(enrichTripWithProfile(pt, peerUid, profilesById, currentAuthUser));
             }
           }
         }
@@ -746,10 +849,18 @@ export function TripProvider({ children }) {
         }
       }
 
-      // 7. Combine all cloud sources (`profileExtractedTrips`, `peerRelayTrips`, `dbTripsRows`, `authMetaTrips`) without duplicates
+      // Check if local trips has any own trip marked 'completed' so dbTripsRows doesn't resurrect it as 'active'
+      const currentStoredForStatus = tripsRef.current && tripsRef.current.length > 0 ? tripsRef.current : getStoredTrips();
+      const completedOwnDestDates = new Set(
+        currentStoredForStatus
+          .filter(lt => lt && lt.status === 'completed' && isTripOwnedByUser(lt, currentAuthUserId, currentAuthUser))
+          .map(lt => makeDestDateKey(lt.destination, lt.departure_date || lt.departureDate || ''))
+      );
+
+      // 7. Combine all cloud sources (`peerRelayTrips`, `profileExtractedTrips`, `dbTripsRows`, `authMetaTrips`) without duplicates
       const combinedCloud = [
-        ...profileExtractedTrips,
         ...peerRelayTrips,
+        ...profileExtractedTrips,
         ...dbTripsRows,
         ...authMetaTrips,
       ];
@@ -760,11 +871,21 @@ export function TripProvider({ children }) {
         const dep = ct.departure_date || ct.departureDate || '';
         const ddKey = makeDestDateKey(ct.destination, dep);
 
-        if (ownerUid === currentAuthUserId && (deletedTripsRef.current.has(ct.id) || deletedTripsRef.current.has(ddKey))) {
-          continue;
-        }
-        if (ownerUid !== currentAuthUserId && explicitlyClearedPeers.has(ownerUid) && !profileExtractedTrips.includes(ct) && !peerRelayTrips.includes(ct)) {
-          continue;
+        if (ownerUid === currentAuthUserId) {
+          if (deletedTripsRef.current.has(ct.id) || deletedTripsRef.current.has(ddKey) || completedOwnDestDates.has(ddKey)) {
+            continue;
+          }
+        } else if (ownerUid) {
+          const peerEntry = peerTripsRef.current[ownerUid];
+          if (peerEntry) {
+            const peerDelSet = new Set(peerEntry.deleted_keys || []);
+            if (peerDelSet.has(ct.id) || peerDelSet.has(ddKey)) {
+              continue;
+            }
+            if (peerEntry.explicitly_empty && !peerRelayTrips.includes(ct)) {
+              continue;
+            }
+          }
         }
 
         const key = makeTripDedupKey(ownerUid, ct.destination, dep);
@@ -773,102 +894,9 @@ export function TripProvider({ children }) {
           cloudTrips.push(enrichTripWithProfile(ct, ownerUid, profilesById, currentAuthUser));
         }
       }
-
-      // 8. Auto-sync current user's own active trips (from localStorage, `trips` table, or `user_metadata`) across all channels
-      if (currentAuthUserId && !syncingRef.current) {
-        try {
-          syncingRef.current = true;
-          const storedTrips = tripsRef.current && tripsRef.current.length > 0 ? tripsRef.current : getStoredTrips();
-          const myLocalTrips = storedTrips.filter(lt => {
-            if (!lt || !lt.destination || lt.status === 'completed') return false;
-            const uid = lt.user_id || lt.userId;
-            const isMine = uid === currentAuthUserId || !uid || String(uid).startsWith('local_') || String(uid).startsWith('user_');
-            if (!isMine) return false;
-            const dep = lt.departure_date || lt.departureDate || '';
-            return !deletedTripsRef.current.has(lt.id) && !deletedTripsRef.current.has(makeDestDateKey(lt.destination, dep));
-          });
-
-          const myCloudTrips = cloudTrips.filter(ct => (ct.user_id || ct.userId) === currentAuthUserId);
-          const allMyTripsCombined = [
-            ...myLocalTrips.map(lt => enrichTripWithProfile({ ...lt, user_id: currentAuthUserId, userId: currentAuthUserId }, currentAuthUserId, profilesById, currentAuthUser)),
-            ...myCloudTrips,
-          ];
-
-          // Deduplicate own trips
-          const mySeen = new Set();
-          const myUniqueTrips = [];
-          for (const mt of allMyTripsCombined) {
-            const dep = mt.departure_date || mt.departureDate || '';
-            const k = makeDestDateKey(mt.destination, dep);
-            if (!mySeen.has(k)) {
-              mySeen.add(k);
-              myUniqueTrips.push(mt);
-            }
-          }
-
-          // Merge any local-only own trips into cloudTrips immediately
-          for (const mt of myUniqueTrips) {
-            const dep = mt.departure_date || mt.departureDate || '';
-            const key = makeTripDedupKey(currentAuthUserId, mt.destination, dep);
-            if (!seenCloudKeys.has(key)) {
-              seenCloudKeys.add(key);
-              cloudTrips.push(mt);
-            }
-          }
-
-          // Check if `profiles` row or multi-channel sync needs to be updated
-          const myProfileKeys = new Set(
-            profileExtractedTrips
-              .filter(pt => (pt.user_id || pt.userId) === currentAuthUserId)
-              .map(pt => makeDestDateKey(pt.destination, pt.departure_date || pt.departureDate || ''))
-          );
-          const hasUnsyncedToProfile = myUniqueTrips.some(mt =>
-            !myProfileKeys.has(makeDestDateKey(mt.destination, mt.departure_date || mt.departureDate || ''))
-          );
-
-          const currentSig = `${currentAuthUserId}:${JSON.stringify(myUniqueTrips.map(t => `${t.destination}_${t.departure_date}_${t.duration}_${t.status}`))}`;
-
-          if (myUniqueTrips.length > 0 && (hasUnsyncedToProfile || lastSyncedSignatureRef.current !== currentSig)) {
-            if (lastSyncedSignatureRef.current !== currentSig) {
-              await syncTripsToProfile(currentAuthUserId, myUniqueTrips);
-
-              // Also ensure each own trip exists in `public.trips` table
-              const myDbKeys = new Set(
-                dbTripsRows
-                  .filter(dt => (dt.user_id || dt.userId) === currentAuthUserId)
-                  .map(dt => makeDestDateKey(dt.destination, dt.departure_date || dt.departureDate || ''))
-              );
-              for (const mt of myUniqueTrips) {
-                const mk = makeDestDateKey(mt.destination, mt.departure_date || mt.departureDate || '');
-                if (!myDbKeys.has(mk)) {
-                  await insertTripIntoDb(currentAuthUserId, mt, {
-                    duration: mt.duration || '7 days',
-                    group_size: mt.group_size || '2',
-                    travel_style: mt.travel_style || 'Mid-range',
-                    status: mt.status || 'active',
-                    created_at: mt.created_at,
-                    user_name: mt.user_name,
-                    user_city: mt.user_city,
-                    user_age: mt.user_age,
-                    user_gender: mt.user_gender,
-                    user_experience: mt.user_experience,
-                    user_hobbies: mt.user_hobbies,
-                    user_music: mt.user_music,
-                    user_bio: mt.user_bio,
-                  });
-                }
-              }
-            }
-          }
-        } catch (syncErr) {
-          console.warn('Auto-sync to profile error:', syncErr);
-        } finally {
-          syncingRef.current = false;
-        }
-      }
     }
 
-    // 9. Merge cloudTrips with local trips (preserving both own unsynced trips AND other local accounts' trips on same browser)
+    // 8. Merge cloudTrips with local trips immediately so UI updates before background syncs
     const currentLocalTrips = tripsRef.current && tripsRef.current.length > 0 ? tripsRef.current : getStoredTrips();
     const cloudKeys = new Set(
       cloudTrips.map(ct => makeTripDedupKey(ct.user_id || ct.userId, ct.destination, ct.departure_date || ct.departureDate))
@@ -876,9 +904,11 @@ export function TripProvider({ children }) {
 
     const extraLocal = currentLocalTrips
       .filter(lt => {
-        if (!lt || !lt.destination || lt.status === 'completed') return false;
+        if (!lt || !lt.destination) return false;
         const uid = lt.user_id || lt.userId;
-        const isOwn = !currentAuthUserId || uid === currentAuthUserId || !uid || String(uid).startsWith('local_') || String(uid).startsWith('user_');
+        const isOwn = currentAuthUserId
+          ? isTripOwnedByUser(lt, currentAuthUserId, currentAuthUser)
+          : (!isUUID(uid));
         const effectiveUid = isOwn ? (currentAuthUserId || uid) : uid;
         const dep = lt.departure_date || lt.departureDate || '';
         const ddKey = makeDestDateKey(lt.destination, dep);
@@ -886,8 +916,15 @@ export function TripProvider({ children }) {
         if (isOwn && (deletedTripsRef.current.has(lt.id) || deletedTripsRef.current.has(ddKey))) {
           return false;
         }
-        if (!isOwn && peerTripsRef.current[effectiveUid] && Array.isArray(peerTripsRef.current[effectiveUid].trips) && peerTripsRef.current[effectiveUid].trips.length === 0) {
+        // Keep own 'completed' trips in My Trips, but exclude peer 'completed' trips
+        if (!isOwn && lt.status === 'completed') {
           return false;
+        }
+        if (!isOwn && effectiveUid && peerTripsRef.current[effectiveUid]) {
+          const peerDelSet = new Set(peerTripsRef.current[effectiveUid].deleted_keys || []);
+          if (peerDelSet.has(lt.id) || peerDelSet.has(ddKey) || peerTripsRef.current[effectiveUid].explicitly_empty) {
+            return false;
+          }
         }
 
         const key = makeTripDedupKey(effectiveUid, lt.destination, dep);
@@ -895,9 +932,11 @@ export function TripProvider({ children }) {
       })
       .map(lt => {
         const uid = lt.user_id || lt.userId;
-        const isOwn = !currentAuthUserId || uid === currentAuthUserId || !uid || String(uid).startsWith('local_') || String(uid).startsWith('user_');
+        const isOwn = currentAuthUserId
+          ? isTripOwnedByUser(lt, currentAuthUserId, currentAuthUser)
+          : (!isUUID(uid));
         const effectiveUid = isOwn ? (currentAuthUserId || uid) : uid;
-        return enrichTripWithProfile({ ...lt, user_id: effectiveUid, userId: effectiveUid }, effectiveUid, {}, currentAuthUser);
+        return enrichTripWithProfile({ ...lt, user_id: effectiveUid, userId: effectiveUid }, effectiveUid, profilesById, currentAuthUser);
       });
 
     const merged = [...cloudTrips, ...extraLocal];
@@ -909,8 +948,102 @@ export function TripProvider({ children }) {
       return timeB - timeA;
     });
 
+    hasLoadedInitialTripsRef.current = true;
     setTripsAndPersist(merged);
     if (!silent) setLoading(false);
+
+    // 9. Auto-sync current user's own active trips across all channels in the background
+    if (useSupabase && currentAuthUserId && !syncingRef.current) {
+      try {
+        syncingRef.current = true;
+        const myActiveMerged = merged.filter(mt =>
+          mt &&
+          mt.destination &&
+          mt.status !== 'completed' &&
+          (mt.user_id || mt.userId) === currentAuthUserId &&
+          !deletedTripsRef.current.has(mt.id) &&
+          !deletedTripsRef.current.has(makeDestDateKey(mt.destination, mt.departure_date || mt.departureDate || ''))
+        );
+
+        const mySeen = new Set();
+        const myUniqueTrips = [];
+        for (const mt of myActiveMerged) {
+          const dep = mt.departure_date || mt.departureDate || '';
+          const k = makeDestDateKey(mt.destination, dep);
+          if (!mySeen.has(k)) {
+            mySeen.add(k);
+            myUniqueTrips.push(mt);
+          }
+        }
+
+        const myProfileKeys = new Set(
+          profileExtractedTrips
+            .filter(pt => (pt.user_id || pt.userId) === currentAuthUserId)
+            .map(pt => makeDestDateKey(pt.destination, pt.departure_date || pt.departureDate || ''))
+        );
+        const hasUnsyncedToProfile = myUniqueTrips.some(mt =>
+          !myProfileKeys.has(makeDestDateKey(mt.destination, mt.departure_date || mt.departureDate || ''))
+        );
+
+        const peerCount = profilesList.filter(p => p && isUUID(p.id) && p.id !== currentAuthUserId).length;
+        const peerCountIncreased = peerCount > lastSyncedPeerCountRef.current;
+
+        const currentSig = `${currentAuthUserId}:${JSON.stringify(myUniqueTrips.map(t => `${t.destination}_${t.departure_date}_${t.duration}_${t.status}`))}`;
+
+        // Ensure Realtime channel always tracks own active trips once subscribed
+        if (myUniqueTrips.length > 0 && realtimeChannelRef.current && lastRealtimeTrackedSigRef.current !== currentSig) {
+          lastRealtimeTrackedSigRef.current = currentSig;
+          const rtPayload = {
+            user_id: currentAuthUserId,
+            trips: myUniqueTrips,
+            deleted_keys: Array.from(deletedTripsRef.current),
+            explicitly_empty: false,
+            updated_at: new Date().toISOString(),
+          };
+          realtimeChannelRef.current.track(rtPayload).catch(() => {});
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'trips_updated',
+            payload: rtPayload,
+          }).catch(() => {});
+        }
+
+        if (myUniqueTrips.length > 0 && (lastSyncedSignatureRef.current !== currentSig || peerCountIncreased || (hasUnsyncedToProfile && !lastSyncedSignatureRef.current))) {
+          await syncTripsToProfile(currentAuthUserId, myUniqueTrips);
+
+          // Also ensure each own trip exists in `public.trips` table
+          const myDbKeys = new Set(
+            dbTripsRows
+              .filter(dt => (dt.user_id || dt.userId) === currentAuthUserId)
+              .map(dt => makeDestDateKey(dt.destination, dt.departure_date || dt.departureDate || ''))
+          );
+          for (const mt of myUniqueTrips) {
+            const mk = makeDestDateKey(mt.destination, mt.departure_date || mt.departureDate || '');
+            if (!myDbKeys.has(mk)) {
+              await insertTripIntoDb(currentAuthUserId, mt, {
+                duration: mt.duration || '7 days',
+                group_size: mt.group_size || '2',
+                travel_style: mt.travel_style || 'Mid-range',
+                status: mt.status || 'active',
+                created_at: mt.created_at,
+                user_name: mt.user_name,
+                user_city: mt.user_city,
+                user_age: mt.user_age,
+                user_gender: mt.user_gender,
+                user_experience: mt.user_experience,
+                user_hobbies: mt.user_hobbies,
+                user_music: mt.user_music,
+                user_bio: mt.user_bio,
+              });
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Auto-sync to profile error:', syncErr);
+      } finally {
+        syncingRef.current = false;
+      }
+    }
   }, [useSupabase, formatDbTrip, parseProfileTrips, enrichTripWithProfile, syncTripsToProfile, insertTripIntoDb, setTripsAndPersist]);
 
   useEffect(() => {
@@ -932,6 +1065,7 @@ export function TripProvider({ children }) {
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
           currentUserIdRef.current = session?.user?.id || null;
           lastSyncedSignatureRef.current = '';
+          lastRealtimeTrackedSigRef.current = '';
           loadTrips(true);
         });
         authSub = data?.subscription;
@@ -950,6 +1084,11 @@ export function TripProvider({ children }) {
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
             loadTrips(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+            if (String(payload?.new?.last_message || '').startsWith(TRIP_SYNC_PREFIX)) {
+              loadTrips(true);
+            }
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
             if (String(payload?.new?.text || '').startsWith(TRIP_SYNC_PREFIX)) {
@@ -974,13 +1113,21 @@ export function TripProvider({ children }) {
         globalSyncChannel
           .on('broadcast', { event: 'trips_updated' }, ({ payload }) => {
             if (payload && payload.user_id) {
-              applyIncomingPeerTrips(payload.user_id, payload.trips, payload.updated_at);
+              applyIncomingPeerTrips(
+                payload.user_id,
+                payload.trips,
+                payload.updated_at,
+                payload.deleted_keys,
+                payload.explicitly_empty
+              );
             }
           })
           .on('broadcast', { event: 'request_trips' }, async () => {
             const myUid = currentUserIdRef.current;
-            if (!myUid) return;
-            const myActive = (tripsRef.current || []).filter(t => (t.user_id || t.userId) === myUid && t.status !== 'completed');
+            if (!myUid || !hasLoadedInitialTripsRef.current) return;
+            const myActive = (tripsRef.current || []).filter(t =>
+              t && t.destination && t.status !== 'completed' && isTripOwnedByUser(t, myUid)
+            );
             if (myActive.length > 0 && globalSyncChannel) {
               globalSyncChannel.send({
                 type: 'broadcast',
@@ -988,6 +1135,8 @@ export function TripProvider({ children }) {
                 payload: {
                   user_id: myUid,
                   trips: myActive,
+                  deleted_keys: Array.from(deletedTripsRef.current),
+                  explicitly_empty: false,
                   updated_at: new Date().toISOString(),
                 }
               }).catch(() => {});
@@ -999,7 +1148,13 @@ export function TripProvider({ children }) {
               for (const presences of Object.values(state || {})) {
                 for (const p of presences || []) {
                   if (p && p.user_id && Array.isArray(p.trips)) {
-                    applyIncomingPeerTrips(p.user_id, p.trips, p.updated_at);
+                    applyIncomingPeerTrips(
+                      p.user_id,
+                      p.trips,
+                      p.updated_at,
+                      p.deleted_keys,
+                      p.explicitly_empty
+                    );
                   }
                 }
               }
@@ -1015,15 +1170,21 @@ export function TripProvider({ children }) {
                 payload: { timestamp: Date.now() },
               }).catch(() => {});
 
-              // Track own current trips in Presence immediately
+              // Only track immediately if own active trips are already loaded and non-empty
               const myUid = currentUserIdRef.current;
-              if (myUid) {
-                const myActive = (tripsRef.current || []).filter(t => (t.user_id || t.userId) === myUid && t.status !== 'completed');
-                globalSyncChannel.track({
-                  user_id: myUid,
-                  trips: myActive,
-                  updated_at: new Date().toISOString(),
-                }).catch(() => {});
+              if (myUid && hasLoadedInitialTripsRef.current) {
+                const myActive = (tripsRef.current || []).filter(t =>
+                  t && t.destination && t.status !== 'completed' && isTripOwnedByUser(t, myUid)
+                );
+                if (myActive.length > 0) {
+                  globalSyncChannel.track({
+                    user_id: myUid,
+                    trips: myActive,
+                    deleted_keys: Array.from(deletedTripsRef.current),
+                    explicitly_empty: false,
+                    updated_at: new Date().toISOString(),
+                  }).catch(() => {});
+                }
               }
             }
           });
@@ -1102,7 +1263,7 @@ export function TripProvider({ children }) {
             const { data: authData } = await supabase.auth.getUser();
             if (authData?.user) {
               authUser = authData.user;
-              authId = authUser.id;
+              authId = authData.id;
             }
           }
 
@@ -1173,11 +1334,34 @@ export function TripProvider({ children }) {
     const updatedSnapshot = baseTrips.map(t => t.id === tripId ? { ...t, ...updates } : t);
     setTripsAndPersist(updatedSnapshot);
 
+    const updatedTripObj = updatedSnapshot.find(t => t.id === tripId);
+
     if (useSupabase) {
       try {
         const { data: authData } = await supabase.auth.getUser();
-        if (authData?.user) {
-          await syncTripsToProfile(authData.user.id, updatedSnapshot);
+        const authId = authData?.user?.id || currentUserIdRef.current;
+        if (authId) {
+          await syncTripsToProfile(authId, updatedSnapshot);
+        }
+        if (updatedTripObj && isUUID(tripId)) {
+          const updatedMeta = {
+            duration: updatedTripObj.duration || '7 days',
+            group_size: updatedTripObj.group_size || '2',
+            travel_style: updatedTripObj.travel_style || 'Mid-range',
+            status: updatedTripObj.status || 'active',
+            created_at: updatedTripObj.created_at,
+            user_name: updatedTripObj.user_name,
+            user_city: updatedTripObj.user_city,
+            user_age: updatedTripObj.user_age,
+            user_gender: updatedTripObj.user_gender,
+            user_experience: updatedTripObj.user_experience,
+            user_hobbies: updatedTripObj.user_hobbies,
+            user_music: updatedTripObj.user_music,
+            user_bio: updatedTripObj.user_bio,
+          };
+          const dbUpdates = { title: JSON.stringify(updatedMeta) };
+          if (updates.destination) dbUpdates.destination = updates.destination;
+          await supabase.from('trips').update(dbUpdates).eq('id', tripId);
         }
       } catch (err) {
         console.warn('Supabase trip update error:', err);
@@ -1211,7 +1395,7 @@ export function TripProvider({ children }) {
     });
     setTripsAndPersist(remainingTrips);
 
-    // 2. Remove from Supabase (`profiles` + `trips` + `messages` relay + `Realtime` + `auth` metadata)
+    // 2. Remove from Supabase (`profiles` + `trips` + `messages`/`conversations` relay + `Realtime` + `auth` metadata)
     if (useSupabase) {
       try {
         let authId = isUUID(uId) ? uId : currentUserIdRef.current;
@@ -1242,16 +1426,8 @@ export function TripProvider({ children }) {
   }, [useSupabase, setTripsAndPersist, syncTripsToProfile]);
 
   const getUserTrips = useCallback((userId) => {
-    if (!userId) return trips;
-    return trips.filter(t => {
-      const tUid = t.user_id || t.userId;
-      if (tUid === userId) return true;
-      if (!tUid) return true;
-      if (String(tUid).startsWith('local_') || String(tUid).startsWith('user_')) {
-        return String(userId).startsWith('local_') || !currentUserIdRef.current || currentUserIdRef.current === userId;
-      }
-      return false;
-    });
+    if (!userId) return [];
+    return trips.filter(t => isTripOwnedByUser(t, userId));
   }, [trips]);
 
   return (
