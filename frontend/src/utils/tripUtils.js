@@ -25,17 +25,18 @@ export function parseDurationDays(duration) {
   }
 
   str = str.toLowerCase().trim();
-  const numMatch = str.match(/\d+/);
-  const num = numMatch ? parseInt(numMatch[0], 10) : 7;
-
-  if (str.includes('month')) {
-    return num * 30;
-  }
-  if (str.includes('week')) {
-    return num * 7;
-  }
   if (str.includes('weekend')) {
     return 3;
+  }
+
+  const numMatch = str.match(/\d+/);
+  const num = numMatch ? parseInt(numMatch[0], 10) : null;
+
+  if (str.includes('month')) {
+    return (num || 1) * 30;
+  }
+  if (str.includes('week')) {
+    return (num || 1) * 7;
   }
   return num || 7;
 }
