@@ -1,15 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const ChatContext = createContext(null);
 
 const CONVOS_KEY = 'wayfari_conversations';
 const MSGS_KEY = 'wayfari_messages';
-
-const isSupabaseConfigured = () => {
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  return key && key !== 'PASTE_YOUR_ANON_KEY_HERE' && key.length > 20;
-};
+const TRIP_SYNC_PREFIX = '__WAYFARI_TRIP_SYNC__';
 
 const getStoredConvos = () => {
   try { return JSON.parse(localStorage.getItem(CONVOS_KEY)) || []; }
@@ -54,15 +50,23 @@ export function ChatProvider({ children }) {
           .order('last_message_time', { ascending: false });
 
         if (data && !error) {
-          dbConvos = data.map(c => ({
-            ...c,
-            buddyName: c.buddy_name || c.buddyName || 'Buddy',
-            buddyAvatar: c.buddy_avatar || c.buddyAvatar || null,
-            lastMessage: c.last_message || '',
-            lastMessageTime: c.last_message_time,
-            unreadCount: c.unread_count || 0,
-            participants: [c.participant_1, c.participant_2],
-          }));
+          dbConvos = data
+            .filter(c => {
+              const lastMsg = String(c.last_message || '');
+              // Hide internal trip sync rows that have no chat messages yet
+              if (lastMsg.startsWith(TRIP_SYNC_PREFIX)) return false;
+              if (!lastMsg.trim() && !c.last_message_time) return false;
+              return true;
+            })
+            .map(c => ({
+              ...c,
+              buddyName: c.buddy_name || c.buddyName || 'Buddy',
+              buddyAvatar: c.buddy_avatar || c.buddyAvatar || null,
+              lastMessage: c.last_message || '',
+              lastMessageTime: c.last_message_time,
+              unreadCount: c.unread_count || 0,
+              participants: [c.participant_1, c.participant_2],
+            }));
         }
       } catch (err) {
         console.warn('Supabase loadConversations error:', err);
@@ -85,17 +89,21 @@ export function ChatProvider({ children }) {
           .eq('conversation_id', convoId)
           .order('created_at', { ascending: true });
 
-        if (data && !error && data.length > 0) {
-          const mapped = data.map(m => ({
-            ...m,
-            senderId: m.sender_id,
-            timestamp: m.created_at,
-          }));
-          setMessages(prev => {
-            const updated = { ...prev, [convoId]: mapped };
-            saveMsgs(updated);
-            return updated;
-          });
+        if (data && !error) {
+          const mapped = data
+            .filter(m => !String(m.text || '').startsWith(TRIP_SYNC_PREFIX))
+            .map(m => ({
+              ...m,
+              senderId: m.sender_id,
+              timestamp: m.created_at,
+            }));
+          if (mapped.length > 0) {
+            setMessages(prev => {
+              const updated = { ...prev, [convoId]: mapped };
+              saveMsgs(updated);
+              return updated;
+            });
+          }
           return;
         }
       } catch (err) {
@@ -117,6 +125,9 @@ export function ChatProvider({ children }) {
             schema: 'public',
             table: 'messages'
           }, (payload) => {
+            if (String(payload?.new?.text || '').startsWith(TRIP_SYNC_PREFIX)) {
+              return;
+            }
             const newMsg = {
               ...payload.new,
               senderId: payload.new.sender_id,
@@ -156,7 +167,6 @@ export function ChatProvider({ children }) {
 
   // ── Get or Create Conversation ──
   const getOrCreateConversation = useCallback(async (userId, buddyId, buddyName, buddyAvatar) => {
-    // Check existing
     const existing = conversations.find(c =>
       (c.participant_1 === userId && c.participant_2 === buddyId) ||
       (c.participant_1 === buddyId && c.participant_2 === userId) ||
@@ -164,7 +174,33 @@ export function ChatProvider({ children }) {
     );
     if (existing) return existing;
 
-    const convoId = [userId, buddyId].sort().join('_');
+    let convoId = [userId, buddyId].sort().join('_');
+
+    if (useSupabase && !String(buddyId).startsWith('seed_') && !String(buddyId).startsWith('local_') && !String(buddyId).startsWith('user_')) {
+      const [p1, p2] = [userId, buddyId].sort();
+      try {
+        const { data: existingDb } = await supabase
+          .from('conversations')
+          .select('*')
+          .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`)
+          .maybeSingle();
+
+        if (existingDb?.id) {
+          convoId = existingDb.id;
+        } else {
+          const { data } = await supabase
+            .from('conversations')
+            .insert({ participant_1: p1, participant_2: p2, last_message: '' })
+            .select()
+            .maybeSingle();
+
+          if (data?.id) {
+            convoId = data.id;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
     const newConvo = {
       id: convoId,
       participant_1: userId,
@@ -177,22 +213,8 @@ export function ChatProvider({ children }) {
       unreadCount: 0,
     };
 
-    setConversations(prev => [newConvo, ...prev]);
+    setConversations(prev => [newConvo, ...prev.filter(c => c.id !== convoId)]);
     setMessages(prev => ({ ...prev, [convoId]: prev[convoId] || [] }));
-
-    if (useSupabase && !buddyId.startsWith('seed_') && !buddyId.startsWith('local_')) {
-      const p1 = [userId, buddyId].sort()[0];
-      const p2 = [userId, buddyId].sort()[1];
-      const { data } = await supabase
-        .from('conversations')
-        .insert({ participant_1: p1, participant_2: p2, last_message: '' })
-        .select()
-        .single();
-
-      if (data) {
-        newConvo.id = data.id;
-      }
-    }
 
     return newConvo;
   }, [conversations, useSupabase]);
@@ -214,7 +236,6 @@ export function ChatProvider({ children }) {
       status: 'sent',
     };
 
-    // Optimistic update
     setMessages(prev => {
       const updated = { ...prev, [convoId]: [...(prev[convoId] || []), msg] };
       if (!useSupabase) saveMsgs(updated);
@@ -231,7 +252,6 @@ export function ChatProvider({ children }) {
       return updated;
     });
 
-    // Try DB insert
     if (useSupabase && !convoId.includes('seed_') && !convoId.includes('local_')) {
       await supabase.from('messages').insert({
         conversation_id: convoId,
@@ -245,7 +265,6 @@ export function ChatProvider({ children }) {
       }).eq('id', convoId);
     }
 
-    // Mark as delivered after brief delay
     setTimeout(() => {
       setMessages(prev => {
         const updated = {
@@ -259,14 +278,12 @@ export function ChatProvider({ children }) {
       });
     }, 800);
 
-    // Simulate buddy response
     simulateBuddyResponse(convoId, senderId, buddyName, text);
 
     return msg;
-  }, [conversations, useSupabase, saveMsgs, saveConvos]);
+  }, [conversations, useSupabase, saveMsgs, saveConvos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const simulateBuddyResponse = (convoId, senderId, buddyName, userText) => {
-    // Context-aware responses based on what the user said
     const contextResponses = getContextualResponse(userText, buddyName);
 
     setTypingUsers(prev => ({ ...prev, [convoId]: true }));

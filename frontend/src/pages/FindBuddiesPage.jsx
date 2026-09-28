@@ -47,8 +47,11 @@ export default function FindBuddiesPage() {
   // Helper: check if a trip belongs to the currently logged-in user
   const isOwnTrip = (b) => {
     if (!user) return false;
-    if (b.userId === user.id) return true;
-    if (String(b.userId).startsWith('local_') || String(b.userId).startsWith('user_')) return true;
+    const bUid = b.userId || b.user_id;
+    if (bUid && bUid === user.id) return true;
+    if (String(bUid).startsWith('local_') || String(bUid).startsWith('user_')) {
+      return String(user.id).startsWith('local_') || !b.user_name || b.user_name === user.name;
+    }
     return false;
   };
 

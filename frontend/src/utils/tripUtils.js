@@ -4,11 +4,27 @@
 
 /**
  * Parses duration string (e.g. "7 days", "2 weeks", "1 month", "weekend") into number of days.
+ * Safely unwraps JSON-encoded duration metadata if present.
  */
 export function parseDurationDays(duration) {
   if (!duration) return 7;
   if (typeof duration === 'number') return duration;
-  const str = String(duration).toLowerCase().trim();
+  let str = String(duration).trim();
+
+  if (str.startsWith('{') || str.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        str = String(parsed[0]?.duration || '7 days');
+      } else if (parsed && typeof parsed === 'object') {
+        str = String(parsed.duration || '7 days');
+      }
+    } catch {
+      return 7;
+    }
+  }
+
+  str = str.toLowerCase().trim();
   const numMatch = str.match(/\d+/);
   const num = numMatch ? parseInt(numMatch[0], 10) : 7;
 
@@ -25,15 +41,18 @@ export function parseDurationDays(duration) {
 }
 
 /**
- * Computes end date string 'YYYY-MM-DD' from departure date and duration.
+ * Computes end date string 'YYYY-MM-DD' from departure date and duration using UTC arithmetic
+ * so positive timezone offsets (e.g. IST UTC+5:30) never shift the date backwards by 1 day.
  */
 export function getTripEndDate(departureDate, duration) {
   if (!departureDate) return null;
   try {
-    const d = new Date(departureDate + 'T00:00:00');
+    const cleanDate = String(departureDate).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) return null;
+    const d = new Date(cleanDate + 'T00:00:00Z');
     if (isNaN(d.getTime())) return null;
     const days = parseDurationDays(duration);
-    d.setDate(d.getDate() + days);
+    d.setUTCDate(d.getUTCDate() + days);
     return d.toISOString().split('T')[0];
   } catch {
     return null;
@@ -42,28 +61,34 @@ export function getTripEndDate(departureDate, duration) {
 
 /**
  * Checks if a trip is upcoming/active.
+ * - If departureDate is not set (flexible date), the trip is considered active/upcoming.
  * - If referenceDate is given (or defaults to today 'YYYY-MM-DD'):
  *   Returns true if the trip's end date has not passed yet.
  */
 export function isTripUpcoming(departureDate, duration, referenceDate) {
-  if (!departureDate) return false;
+  if (!departureDate) return true;
+  const cleanDep = String(departureDate).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDep)) return true;
   const today = referenceDate || new Date().toISOString().split('T')[0];
-  const endDate = getTripEndDate(departureDate, duration);
-  if (!endDate) return false;
-  // If trip already ended in the past -> false
+  const endDate = getTripEndDate(cleanDep, duration);
+  if (!endDate) return cleanDep >= today;
   return endDate >= today;
 }
 
 /**
  * Checks if a trip matches user's preference date filter:
- * "only show if on their preference date anyone is travelling only their profile not everyone
- * like if a traveller traveled 5 days ago and their travel ended dont show them
- * only show upcoming travellers from the users preference date from that date to all other ahead"
+ * - Never shows trips that have already ended relative to today.
+ * - If departureDate is flexible/null, shows in default feed (!preferenceDate).
+ * - If preferenceDate is specified, shows trips departing on/after preferenceDate
+ *   or currently active during preferenceDate.
  */
 export function matchesPreferenceDate(departureDate, duration, preferenceDate) {
-  if (!departureDate) return false;
+  if (!departureDate) return !preferenceDate;
+  const cleanDep = String(departureDate).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDep)) return !preferenceDate;
+
   const today = new Date().toISOString().split('T')[0];
-  const endDate = getTripEndDate(departureDate, duration);
+  const endDate = getTripEndDate(cleanDep, duration);
 
   // If travel already ended relative to today -> never show!
   if (endDate && endDate < today) {
@@ -72,27 +97,34 @@ export function matchesPreferenceDate(departureDate, duration, preferenceDate) {
 
   // If user specified a preference date:
   if (preferenceDate) {
-    // Show travellers departing on or after preference date,
-    // OR travelling during the preference date (trip active on that date)
-    const departsOnOrAfter = departureDate >= preferenceDate;
-    const activeDuring = departureDate <= preferenceDate && endDate && endDate >= preferenceDate;
+    const cleanPref = String(preferenceDate).trim().slice(0, 10);
+    const departsOnOrAfter = cleanDep >= cleanPref;
+    const activeDuring = cleanDep <= cleanPref && endDate && endDate >= cleanPref;
     return departsOnOrAfter || activeDuring;
   }
 
   // If no preference date specified, must be upcoming/active today onwards
-  return endDate ? endDate >= today : departureDate >= today;
+  return endDate ? endDate >= today : cleanDep >= today;
 }
 
 /**
  * User-friendly date formatter: '2026-07-15' -> 'Jul 15, 2026'
  */
 export function formatTripDate(dateStr) {
-  if (!dateStr) return 'Flexible Date';
+  if (!dateStr || dateStr === 'Flexible') return 'Flexible Date';
   try {
-    const d = new Date(dateStr + 'T00:00:00');
-    if (isNaN(d.getTime())) return dateStr;
+    const cleanDate = String(dateStr).trim().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+      const [y, m, day] = cleanDate.split('-').map(Number);
+      const d = new Date(y, m - 1, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
-    return dateStr;
+    return String(dateStr);
   }
 }

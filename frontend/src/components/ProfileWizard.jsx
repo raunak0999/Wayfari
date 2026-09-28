@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTrips } from '../context/TripContext';
 import { useNavigate } from 'react-router-dom';
 import './ProfileWizard.css';
 
@@ -8,6 +9,7 @@ const MUSIC = ['Pop', 'Rock', 'Jazz', 'Hip-Hop', 'Folk', 'Classical', 'EDM', 'Wo
 
 export default function ProfileWizard() {
   const { user, updateProfile, isFemale } = useAuth();
+  const { addTrip } = useTrips();
   const navigate = useNavigate();
   const totalSteps = isFemale ? 4 : 3;
   const [step, setStep] = useState(1);
@@ -87,8 +89,8 @@ export default function ProfileWizard() {
     }));
   };
 
-  const handleFinish = () => {
-    updateProfile({
+  const handleFinish = async () => {
+    await updateProfile({
       profileComplete: true,
       profile,
       preferences,
@@ -100,6 +102,30 @@ export default function ProfileWizard() {
       travelExperience: preferences.travelExperience,
       safety: isFemale ? safety : undefined,
     });
+
+    if (preferences.destination) {
+      const currentUserId = user?.id || ('local_' + Date.now());
+      await addTrip({
+        userId: currentUserId,
+        user_id: currentUserId,
+        destination: preferences.destination,
+        departureDate: preferences.departureDate || null,
+        departureTime: preferences.departureTime || '',
+        duration: preferences.tripDuration || '7 days',
+        groupSize: preferences.groupSize || '2',
+        travelStyle: preferences.travelStyle || 'Mid-range',
+        user_name: profile.displayName || user?.name || 'Traveler',
+        user_avatar: profile.avatar || user?.profile?.avatar || null,
+        user_city: profile.city || '',
+        user_age: profile.age ? parseInt(profile.age, 10) : null,
+        user_gender: user?.gender || 'other',
+        user_experience: preferences.travelExperience || 'beginner',
+        user_hobbies: interests.hobbies || [],
+        user_music: interests.music || [],
+        user_bio: profile.bio || '',
+      });
+    }
+
     navigate('/find-buddies');
   };
 

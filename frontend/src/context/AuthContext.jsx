@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
@@ -19,12 +19,6 @@ const getErrorMessage = (err) => {
 
 const STORAGE_KEY = 'wayfari_auth';
 const PROFILES_KEY = 'wayfari_profiles';
-
-// Check if Supabase is properly configured
-const isSupabaseConfigured = () => {
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  return key && key !== 'PASTE_YOUR_ANON_KEY_HERE' && key.length > 20;
-};
 
 // ── Local storage helpers ──
 const getStoredAuth = () => {
@@ -48,11 +42,82 @@ const setStoredProfiles = (profiles) => {
   localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
 };
 
+// Merge profile objects without allowing null/empty DB columns to wipe rich local/auth metadata
+const mergeProfileObjects = (...sources) => {
+  const result = {};
+  for (const src of sources) {
+    if (!src || typeof src !== 'object') continue;
+    for (const [k, v] of Object.entries(src)) {
+      if (v === null || v === undefined || v === '') continue;
+      if (Array.isArray(v) && v.length === 0 && Array.isArray(result[k]) && result[k].length > 0) {
+        continue;
+      }
+      if (k === 'gender' && v === 'other' && result.gender && result.gender !== 'other') {
+        continue;
+      }
+      if (k === 'profile_complete' && v === false && result.profile_complete === true) {
+        continue;
+      }
+      result[k] = v;
+    }
+  }
+  return result;
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const useSupabase = isSupabaseConfigured();
+
+  // ── Load profile from Supabase + Auth user_metadata + localStorage ──
+  const loadProfile = async (userId, sessionUser = null) => {
+    const localProfiles = getStoredProfiles();
+    const localProf = localProfiles[userId] || null;
+    const activeUser = sessionUser || user;
+    const metaProf = activeUser?.user_metadata?.wayfari_profile || null;
+
+    const baseFallback = {
+      id: userId,
+      name: activeUser?.user_metadata?.full_name || activeUser?.user_metadata?.name || activeUser?.email?.split('@')[0] || 'Traveler',
+      email: activeUser?.email || '',
+      gender: activeUser?.user_metadata?.gender || 'other',
+      profile_complete: false,
+      hobbies: [],
+      music: [],
+    };
+
+    if (!useSupabase) {
+      const mergedLocal = mergeProfileObjects(baseFallback, metaProf, localProf);
+      setProfile(mergedLocal);
+      return mergedLocal;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const merged = mergeProfileObjects(baseFallback, data && !error ? data : null, metaProf, localProf);
+      if (!merged.hobbies) merged.hobbies = [];
+      if (!merged.music) merged.music = [];
+
+      const updatedLocal = getStoredProfiles();
+      updatedLocal[userId] = merged;
+      setStoredProfiles(updatedLocal);
+      setProfile(merged);
+      return merged;
+    } catch (err) {
+      console.warn('Profile load exception, using merged fallback:', err);
+      const merged = mergeProfileObjects(baseFallback, metaProf, localProf);
+      if (!merged.hobbies) merged.hobbies = [];
+      if (!merged.music) merged.music = [];
+      setProfile(merged);
+      return merged;
+    }
+  };
 
   // ── Initialize ──
   useEffect(() => {
@@ -70,7 +135,7 @@ export function AuthProvider({ children }) {
           if (!mounted) return;
           if (session?.user) {
             setUser(session.user);
-            loadProfile(session.user.id);
+            loadProfile(session.user.id, session.user);
           }
           setLoading(false);
           clearTimeout(safetyTimer);
@@ -94,7 +159,7 @@ export function AuthProvider({ children }) {
                   .from('profiles')
                   .select('id')
                   .eq('id', session.user.id)
-                  .single();
+                  .maybeSingle();
 
                 if (!existingProfile) {
                   await supabase.from('profiles').insert({
@@ -106,7 +171,7 @@ export function AuthProvider({ children }) {
                   });
                 }
 
-                await loadProfile(session.user.id);
+                await loadProfile(session.user.id, session.user);
               } catch (profileErr) {
                 console.warn('Profile creation/loading error:', profileErr);
               }
@@ -142,47 +207,7 @@ export function AuthProvider({ children }) {
       clearTimeout(safetyTimer);
       return () => { mounted = false; };
     }
-  }, [useSupabase]);
-
-  // ── Load profile from Supabase ──
-  const loadProfile = async (userId) => {
-    if (!useSupabase) {
-      const profiles = getStoredProfiles();
-      if (profiles[userId]) setProfile(profiles[userId]);
-      return;
-    }
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (data && !error) {
-        setProfile(data);
-      } else {
-        // Fallback minimal profile if single row fails or RLS restricts
-        setProfile(prev => prev || {
-          id: userId,
-          name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Traveler',
-          email: user?.email,
-          profile_complete: false,
-          hobbies: [],
-          music: []
-        });
-      }
-    } catch (err) {
-      console.warn('Profile load exception, using fallback:', err);
-      setProfile(prev => prev || {
-        id: userId,
-        name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Traveler',
-        email: user?.email,
-        profile_complete: false,
-        hobbies: [],
-        music: []
-      });
-    }
-  };
+  }, [useSupabase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Signup ──
   const signup = async (name, email, password, gender) => {
@@ -211,20 +236,26 @@ export function AuthProvider({ children }) {
         if (data.user) {
           // If session is active (email confirmation disabled in Supabase), create profile
           if (data.session) {
-            const { error: profileError } = await supabase.from('profiles').upsert({
+            const initialProf = {
               id: data.user.id,
               name,
               email,
               gender: gender.toLowerCase(),
               profile_complete: false
-            });
+            };
+
+            const localProfiles = getStoredProfiles();
+            localProfiles[data.user.id] = initialProf;
+            setStoredProfiles(localProfiles);
+
+            const { error: profileError } = await supabase.from('profiles').upsert(initialProf);
 
             if (profileError) {
               console.error('Profile creation error:', profileError);
             }
 
             setUser(data.user);
-            await loadProfile(data.user.id);
+            await loadProfile(data.user.id, data.user);
           } else {
             // Email confirmation is required by Supabase
             return {
@@ -254,7 +285,7 @@ export function AuthProvider({ children }) {
       name,
       email,
       gender: gender.toLowerCase(),
-      password, // stored locally only — not production-grade
+      password,
       profile_complete: false,
       hobbies: [],
       music: [],
@@ -294,7 +325,7 @@ export function AuthProvider({ children }) {
         }
 
         setUser(data.user);
-        await loadProfile(data.user.id);
+        await loadProfile(data.user.id, data.user);
         return { success: true };
       } catch (err) {
         return { success: false, error: getErrorMessage(err) };
@@ -316,20 +347,22 @@ export function AuthProvider({ children }) {
 
   // ── Logout ──
   const logout = () => {
-    // Fire-and-forget signOut — don't await it so logout is never blocked
     if (useSupabase) {
       supabase.auth.signOut().catch(err => {
         console.warn('Supabase signOut error:', err);
       });
     }
-    // Clear all Wayfari-related storage immediately
     setStoredAuth(null);
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(PROFILES_KEY);
-    localStorage.removeItem('wayfari_connections');
-    localStorage.removeItem('wayfari_conversations');
-    localStorage.removeItem('wayfari_messages');
-    localStorage.removeItem('wayfari_trips');
+    // Clean up only anonymous temporary trips while preserving UUID-authenticated trips
+    try {
+      const existingTrips = JSON.parse(localStorage.getItem('wayfari_trips')) || [];
+      const keptTrips = existingTrips.filter(t => {
+        const uid = String(t.user_id || t.userId || '');
+        return uid && !uid.startsWith('local_') && !uid.startsWith('user_');
+      });
+      localStorage.setItem('wayfari_trips', JSON.stringify(keptTrips));
+    } catch { /* ignore */ }
     setUser(null);
     setProfile(null);
   };
@@ -343,9 +376,8 @@ export function AuthProvider({ children }) {
           options: { redirectTo: window.location.origin + '/find-buddies' }
         });
         if (error) return { success: false, error: error.message };
-        // Supabase handles the redirect — return success
         return { success: true };
-      } catch (err) {
+      } catch {
         return { success: false, error: `${provider === 'google' ? 'Google' : 'GitHub'} login is not configured. Please use email and password.` };
       }
     }
@@ -357,11 +389,11 @@ export function AuthProvider({ children }) {
     if (!user) return;
 
     const currentProfile = profile || {};
-    const merged = { ...currentProfile };
+    const merged = { ...currentProfile, id: user.id };
 
     if (updates.profile) {
       if (updates.profile.displayName) merged.name = updates.profile.displayName;
-      if (updates.profile.age) merged.age = parseInt(updates.profile.age);
+      if (updates.profile.age) merged.age = parseInt(updates.profile.age, 10);
       if (updates.profile.city) merged.city = updates.profile.city;
       if (updates.profile.bio) merged.bio = updates.profile.bio;
       if (updates.profile.avatar) merged.avatar_url = updates.profile.avatar;
@@ -397,76 +429,100 @@ export function AuthProvider({ children }) {
       merged.checkin_interval = updates.safety.checkInInterval ?? '2hr';
     }
 
-    // ── Supabase update (only columns that exist in live profiles table) ──
+    // 1. Always persist immediately to localStorage and React state so UI never self-wipes
+    const localProfiles = getStoredProfiles();
+    localProfiles[user.id] = merged;
+    setStoredProfiles(localProfiles);
+    setProfile(merged);
+
+    // 2. Sync to Supabase (`profiles` table + Auth `user_metadata`)
     if (useSupabase) {
-      const dbUpdates = {};
-      if (merged.name && merged.name !== currentProfile.name) dbUpdates.name = merged.name;
-      if (merged.age) dbUpdates.age = merged.age;
-      if (merged.city) dbUpdates.city = merged.city;
-      if (merged.avatar_url) dbUpdates.avatar_url = merged.avatar_url;
-      if (merged.destination) dbUpdates.destination = merged.destination;
-      if (merged.departure_date && /^\d{4}-\d{2}-\d{2}$/.test(String(merged.departure_date))) {
-        dbUpdates.departure_date = merged.departure_date;
-      }
-      if (merged.trip_duration && !String(merged.trip_duration).startsWith('[')) {
-        // Preserve existing JSON trip array if present, or store duration string
-        if (!currentProfile.trip_duration || !String(currentProfile.trip_duration).startsWith('[')) {
-          dbUpdates.trip_duration = merged.trip_duration;
+      try {
+        // Save compact copy to Auth user_metadata (always succeeds for own user even if profiles UPDATE RLS is restricted)
+        const compactMetaProfile = { ...merged };
+        if (compactMetaProfile.avatar_url && String(compactMetaProfile.avatar_url).length > 4096) {
+          delete compactMetaProfile.avatar_url;
         }
-      }
-      if (merged.group_size) dbUpdates.group_size = merged.group_size;
-      if (merged.travel_style) dbUpdates.travel_style = merged.travel_style;
-      if (merged.hobbies) dbUpdates.hobbies = merged.hobbies;
-      if (merged.music) dbUpdates.music = merged.music;
-      if (merged.noise_level) dbUpdates.noise_level = merged.noise_level;
-      if (merged.sleep_schedule) dbUpdates.sleep_schedule = merged.sleep_schedule;
-      if (merged.profile_complete !== undefined) dbUpdates.profile_complete = merged.profile_complete;
+        supabase.auth.updateUser({
+          data: {
+            name: merged.name,
+            wayfari_profile: compactMetaProfile,
+          }
+        }).catch(() => {});
 
-      if (Object.keys(dbUpdates).length > 0) {
-        const { error } = await supabase
-          .from('profiles')
-          .update(dbUpdates)
-          .eq('id', user.id);
-
-        if (error) {
-          console.error('Profile update error:', error);
+        const dbUpdates = {};
+        if (merged.name) dbUpdates.name = merged.name;
+        if (merged.age) dbUpdates.age = merged.age;
+        if (merged.city) dbUpdates.city = merged.city;
+        if (merged.avatar_url) dbUpdates.avatar_url = merged.avatar_url;
+        if (merged.destination) dbUpdates.destination = merged.destination;
+        if (merged.departure_date && /^\d{4}-\d{2}-\d{2}$/.test(String(merged.departure_date))) {
+          dbUpdates.departure_date = merged.departure_date;
         }
-      }
-
-      // Handle safety contacts separately
-      if (updates.safety?.contacts?.length > 0) {
-        await supabase.from('safety_contacts').delete().eq('user_id', user.id);
-        const contactRows = updates.safety.contacts
-          .filter(c => c.name || c.phone)
-          .map(c => ({
-            user_id: user.id,
-            name: c.name,
-            phone: c.phone,
-            relationship: c.relationship
-          }));
-        if (contactRows.length > 0) {
-          await supabase.from('safety_contacts').insert(contactRows);
+        if (merged.trip_duration && !String(merged.trip_duration).startsWith('[')) {
+          if (!currentProfile.trip_duration || !String(currentProfile.trip_duration).startsWith('[')) {
+            dbUpdates.trip_duration = merged.trip_duration;
+          }
         }
-      }
+        if (merged.group_size) dbUpdates.group_size = merged.group_size;
+        if (merged.travel_style) dbUpdates.travel_style = merged.travel_style;
+        if (merged.hobbies) dbUpdates.hobbies = merged.hobbies;
+        if (merged.music) dbUpdates.music = merged.music;
+        if (merged.noise_level) dbUpdates.noise_level = merged.noise_level;
+        if (merged.sleep_schedule) dbUpdates.sleep_schedule = merged.sleep_schedule;
+        if (merged.profile_complete !== undefined) dbUpdates.profile_complete = merged.profile_complete;
 
-      await loadProfile(user.id);
-    } else {
-      // ── Local update ──
-      const profiles = getStoredProfiles();
-      profiles[user.id] = merged;
-      setStoredProfiles(profiles);
-      setProfile(merged);
+        if (Object.keys(dbUpdates).length > 0) {
+          const { data: updatedRow, error } = await supabase
+            .from('profiles')
+            .update(dbUpdates)
+            .eq('id', user.id)
+            .select()
+            .maybeSingle();
+
+          if (error) {
+            console.warn('Profile update error:', error);
+          } else if (updatedRow) {
+            const combinedRow = mergeProfileObjects(updatedRow, merged);
+            const refreshedLocal = getStoredProfiles();
+            refreshedLocal[user.id] = combinedRow;
+            setStoredProfiles(refreshedLocal);
+            setProfile(combinedRow);
+          }
+        }
+
+        // Handle safety contacts separately
+        if (updates.safety?.contacts?.length > 0) {
+          await supabase.from('safety_contacts').delete().eq('user_id', user.id);
+          const contactRows = updates.safety.contacts
+            .filter(c => c.name || c.phone)
+            .map(c => ({
+              user_id: user.id,
+              name: c.name,
+              phone: c.phone,
+              relationship: c.relationship
+            }));
+          if (contactRows.length > 0) {
+            await supabase.from('safety_contacts').insert(contactRows);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase profile update exception:', err);
+      }
     }
   };
 
   // Extract clean duration string if profile.trip_duration stores JSON trips array
   const getCleanProfileDuration = (rawDur) => {
     if (!rawDur) return null;
-    if (typeof rawDur === 'string' && rawDur.startsWith('[')) {
+    if (typeof rawDur === 'string' && (rawDur.startsWith('[') || rawDur.startsWith('{'))) {
       try {
         const parsed = JSON.parse(rawDur);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed[0].duration || '7 days';
+        }
+        if (parsed && typeof parsed === 'object') {
+          return parsed.duration || '7 days';
         }
         return null;
       } catch {
@@ -479,15 +535,15 @@ export function AuthProvider({ children }) {
   // Build a user-like object that components expect
   const combinedUser = user && profile ? {
     id: user.id,
-    name: profile.name,
+    name: profile.name || user.user_metadata?.name || 'Traveler',
     email: profile.email || user.email,
-    gender: profile.gender || user.user_metadata?.gender,
+    gender: (profile.gender && profile.gender !== 'other') ? profile.gender : (user.user_metadata?.gender || profile.gender || 'other'),
     travelExperience: profile.travel_experience || 'beginner',
     travel_experience: profile.travel_experience || 'beginner',
     profileComplete: profile.profile_complete,
     profile: {
       avatar: profile.avatar_url,
-      displayName: profile.name,
+      displayName: profile.name || user.user_metadata?.name || 'Traveler',
       age: profile.age,
       city: profile.city,
       bio: profile.bio,
@@ -518,7 +574,6 @@ export function AuthProvider({ children }) {
     },
     createdAt: profile.created_at,
   } : (user ? {
-    // Minimal user object when profile hasn't loaded yet
     id: user.id,
     name: user.user_metadata?.name || '',
     email: user.email,

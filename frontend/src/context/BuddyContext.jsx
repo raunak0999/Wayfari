@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useTrips } from './TripContext';
 import { matchesPreferenceDate } from '../utils/tripUtils';
 
@@ -7,11 +7,6 @@ const BuddyContext = createContext(null);
 
 const CONNECTIONS_KEY = 'wayfari_connections';
 const PROFILES_KEY = 'wayfari_profiles';
-
-const isSupabaseConfigured = () => {
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  return key && key !== 'PASTE_YOUR_ANON_KEY_HERE' && key.length > 20;
-};
 
 const getStoredConnections = () => {
   try { return JSON.parse(localStorage.getItem(CONNECTIONS_KEY)) || []; }
@@ -27,6 +22,18 @@ const getStoredLocalProfiles = () => {
   catch { return {}; }
 };
 
+// Merge two profile objects without allowing null/empty DB fields to wipe populated local fields
+const mergeTwoProfiles = (localP = {}, dbP = {}) => {
+  const result = { ...localP };
+  for (const [k, v] of Object.entries(dbP)) {
+    if (v === null || v === undefined || v === '') continue;
+    if (Array.isArray(v) && v.length === 0 && Array.isArray(result[k]) && result[k].length > 0) continue;
+    if (k === 'gender' && v === 'other' && result.gender && result.gender !== 'other') continue;
+    result[k] = v;
+  }
+  return result;
+};
+
 export function BuddyProvider({ children }) {
   const { trips, loading: tripsLoading } = useTrips();
   const [profiles, setProfiles] = useState(getStoredLocalProfiles);
@@ -34,9 +41,9 @@ export function BuddyProvider({ children }) {
   const [profilesLoading, setProfilesLoading] = useState(false);
   const useSupabase = isSupabaseConfigured();
 
-  // Load all user profiles from Supabase and merge with local storage
+  // Load all user profiles from Supabase and merge non-destructively with local storage
   const loadProfiles = useCallback(async () => {
-    let dbProfiles = {};
+    const dbProfiles = {};
     if (useSupabase) {
       try {
         const { data, error } = await supabase
@@ -45,7 +52,7 @@ export function BuddyProvider({ children }) {
 
         if (!error && data) {
           data.forEach(p => {
-            dbProfiles[p.id] = p;
+            if (p && p.id) dbProfiles[p.id] = p;
           });
         }
       } catch (err) {
@@ -53,7 +60,11 @@ export function BuddyProvider({ children }) {
       }
     }
     const localProfiles = getStoredLocalProfiles();
-    const merged = { ...localProfiles, ...dbProfiles };
+    const allIds = new Set([...Object.keys(localProfiles), ...Object.keys(dbProfiles)]);
+    const merged = {};
+    for (const id of allIds) {
+      merged[id] = mergeTwoProfiles(localProfiles[id], dbProfiles[id]);
+    }
     setProfiles(merged);
     setProfilesLoading(false);
   }, [useSupabase]);
@@ -121,25 +132,42 @@ export function BuddyProvider({ children }) {
 
     return trips
       .filter(trip => {
-        if (trip.status === 'completed') return false;
+        if (!trip || !trip.destination || trip.status === 'completed') return false;
         const depDate = trip.departure_date || trip.departureDate;
         const rawDur = trip.duration || trip.trip_duration || '7 days';
-        const duration = typeof rawDur === 'string' && rawDur.trim().startsWith('[') ? '7 days' : rawDur;
+        const duration = typeof rawDur === 'string' && (rawDur.trim().startsWith('[') || rawDur.trim().startsWith('{'))
+          ? '7 days'
+          : rawDur;
         return matchesPreferenceDate(depDate, duration, null);
       })
       .map(trip => {
         const userId = trip.user_id || trip.userId;
         const profile = profiles[userId] || {};
         const rawDur = trip.duration || trip.trip_duration || '7 days';
-        const cleanDur = typeof rawDur === 'string' && rawDur.trim().startsWith('[') ? '7 days' : rawDur;
+        const cleanDur = typeof rawDur === 'string' && (rawDur.trim().startsWith('[') || rawDur.trim().startsWith('{'))
+          ? '7 days'
+          : rawDur;
+
+        const resolvedName =
+          (trip.user_name && trip.user_name !== 'Traveler' ? trip.user_name : null) ||
+          profile.name ||
+          trip.user_name ||
+          'Traveler';
+
+        const resolvedGender =
+          (trip.user_gender && trip.user_gender !== 'other' ? trip.user_gender : null) ||
+          (profile.gender && profile.gender !== 'other' ? profile.gender : null) ||
+          profile.gender ||
+          trip.user_gender ||
+          'other';
 
         return {
           id: trip.id,
           tripId: trip.id,
           userId: userId,
-          name: profile.name || trip.user_name || 'Traveler',
+          name: resolvedName,
           age: profile.age || trip.user_age || 25,
-          gender: profile.gender || trip.user_gender || 'other',
+          gender: resolvedGender,
           city: profile.city || trip.user_city || 'Global Nomad',
           bio: profile.bio || trip.user_bio || 'Excited to explore with fellow travel buddies!',
           avatar: profile.avatar_url || profile.avatar || trip.user_avatar || null,
@@ -308,7 +336,6 @@ export function BuddyProvider({ children }) {
 
     if (!userId || !targetUserId || userId === targetUserId) return;
 
-    // Check if connection already exists
     const existing = connections.find(c =>
       (c.from_user_id === userId && c.to_user_id === targetUserId) ||
       (c.from_user_id === targetUserId && c.to_user_id === userId)
@@ -433,8 +460,7 @@ export function BuddyProvider({ children }) {
       );
     }
 
-    // Preference date filter:
-    // Only show if anyone is travelling on/ahead of preference date, and trip not ended
+    // Preference date filter
     if (filters.date) {
       results = results.filter(b => {
         const depDate = b.departure_date || b.departureDate;
