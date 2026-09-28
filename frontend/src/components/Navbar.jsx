@@ -112,13 +112,19 @@ export default function Navbar() {
                 </Link>
               </MagneticElement>
               <div className="navbar__user">
-                <div className="navbar__avatar">
+                <Link
+                  to="/profile-setup"
+                  className="navbar__avatar"
+                  title="Edit Profile (Age, City, Bio)"
+                  onClick={() => setMenuOpen(false)}
+                  style={{ textDecoration: 'none', cursor: 'pointer' }}
+                >
                   {user.profile?.avatar ? (
                     <img src={user.profile.avatar} alt={user.name} />
                   ) : (
                     <span>{user.name?.[0]?.toUpperCase() || '?'}</span>
                   )}
-                </div>
+                </Link>
                 <button className="btn btn--sm btn--outline" onClick={handleLogout} id="logout-btn">
                   Logout
                 </button>

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTrips } from '../context/TripContext';
+import { formatTripDuration } from '../utils/tripUtils';
 import TripForm from '../components/TripForm';
 import './MyTripsPage.css';
 
 export default function MyTripsPage() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { getUserTrips, addTrip, updateTrip, deleteTrip } = useTrips();
   const [showForm, setShowForm] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -14,14 +15,29 @@ export default function MyTripsPage() {
 
   const handlePostTrip = (formData) => {
     const currentUserId = user?.id || 'local_' + Date.now();
+    const resolvedAge = formData.age
+      ? parseInt(formData.age, 10)
+      : (user?.profile?.age || user?.age || null);
+    const rawCity = formData.city || user?.profile?.city || user?.city || '';
+    const resolvedCity = rawCity && rawCity !== 'Global Nomad' ? String(rawCity).trim() : '';
+
+    if ((formData.age || formData.city) && updateProfile) {
+      updateProfile({
+        profile: {
+          age: resolvedAge || undefined,
+          city: resolvedCity || undefined,
+        }
+      });
+    }
+
     addTrip({
       ...formData,
       userId: currentUserId,
       user_id: currentUserId,
       user_name: user?.profile?.displayName || user?.name || 'Traveler',
       user_avatar: user?.profile?.avatar || user?.profile?.avatar_url || null,
-      user_city: user?.profile?.city || user?.city || '',
-      user_age: user?.profile?.age || user?.age || null,
+      user_city: resolvedCity,
+      user_age: resolvedAge && !isNaN(resolvedAge) ? resolvedAge : null,
       user_gender: user?.gender || user?.profile?.gender || 'other',
       user_experience: user?.travel_experience || user?.travelExperience || user?.profile?.travelExperience || 'intermediate',
       user_hobbies: user?.hobbies || user?.interests?.hobbies || [],
@@ -97,7 +113,7 @@ export default function MyTripsPage() {
                     <span>⏱️</span>
                     <div>
                       <small>Duration</small>
-                      <strong>{trip.duration || 'TBD'}</strong>
+                      <strong>{formatTripDuration(trip.duration || trip.trip_duration)}</strong>
                     </div>
                   </div>
                   <div className="trips-page__detail">
@@ -145,7 +161,14 @@ export default function MyTripsPage() {
         )}
       </div>
 
-      {showForm && <TripForm onSubmit={handlePostTrip} onClose={() => setShowForm(false)} />}
+      {showForm && (
+        <TripForm
+          onSubmit={handlePostTrip}
+          onClose={() => setShowForm(false)}
+          defaultAge={user?.profile?.age || ''}
+          defaultCity={user?.profile?.city && user.profile.city !== 'Global Nomad' ? user.profile.city : ''}
+        />
+      )}
     </div>
   );
 }

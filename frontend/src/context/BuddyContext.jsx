@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useTrips } from './TripContext';
-import { matchesPreferenceDate } from '../utils/tripUtils';
+import { matchesPreferenceDate, formatTripDuration } from '../utils/tripUtils';
 
 const BuddyContext = createContext(null);
 
@@ -22,14 +22,21 @@ const getStoredLocalProfiles = () => {
   catch { return {}; }
 };
 
-// Merge two profile objects without allowing null/empty DB fields to wipe populated local fields
-const mergeTwoProfiles = (localP = {}, dbP = {}) => {
-  const result = { ...localP };
-  for (const [k, v] of Object.entries(dbP)) {
+// Merge two profile objects (base first, override second) without allowing null/empty fields to wipe populated fields
+const mergeTwoProfiles = (baseP = {}, overrideP = {}) => {
+  const result = { ...baseP };
+  if (result.city && String(result.city).trim().toLowerCase() === 'global nomad') {
+    result.city = '';
+  }
+  for (const [k, v] of Object.entries(overrideP)) {
     if (v === null || v === undefined || v === '') continue;
+    if (k === 'city' && String(v).trim().toLowerCase() === 'global nomad') continue;
     if (Array.isArray(v) && v.length === 0 && Array.isArray(result[k]) && result[k].length > 0) continue;
     if (k === 'gender' && v === 'other' && result.gender && result.gender !== 'other') continue;
     result[k] = v;
+  }
+  if (result.city && String(result.city).trim().toLowerCase() === 'global nomad') {
+    result.city = '';
   }
   return result;
 };
@@ -60,10 +67,10 @@ export function BuddyProvider({ children }) {
       }
     }
     const localProfiles = getStoredLocalProfiles();
-    const allIds = new Set([...Object.keys(localProfiles), ...Object.keys(dbProfiles)]);
+    const allIds = new Set([...Object.keys(dbProfiles), ...Object.keys(localProfiles)]);
     const merged = {};
     for (const id of allIds) {
-      merged[id] = mergeTwoProfiles(localProfiles[id], dbProfiles[id]);
+      merged[id] = mergeTwoProfiles(dbProfiles[id], localProfiles[id]);
     }
     setProfiles(merged);
     setProfilesLoading(false);
@@ -89,30 +96,48 @@ export function BuddyProvider({ children }) {
     loadProfiles();
     loadConnections();
 
+    const handleProfileUpdated = (e) => {
+      const updatedProf = e?.detail;
+      if (updatedProf && updatedProf.id) {
+        setProfiles(prev => ({
+          ...prev,
+          [updatedProf.id]: mergeTwoProfiles(prev[updatedProf.id], updatedProf),
+        }));
+      }
+      loadProfiles();
+    };
+    window.addEventListener('wayfari:profile-updated', handleProfileUpdated);
+
+    let profileSub = null;
+    let connSub = null;
+
     if (useSupabase) {
       try {
-        const profileSub = supabase
+        profileSub = supabase
           .channel('profiles-changes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
             loadProfiles();
           })
           .subscribe();
 
-        const connSub = supabase
+        connSub = supabase
           .channel('connections-changes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, () => {
             loadConnections();
           })
           .subscribe();
-
-        return () => {
-          supabase.removeChannel(profileSub);
-          supabase.removeChannel(connSub);
-        };
       } catch (err) {
         console.warn('Supabase realtime subscription error:', err);
       }
     }
+
+    return () => {
+      window.removeEventListener('wayfari:profile-updated', handleProfileUpdated);
+      if (useSupabase) {
+        if (profileSub) supabase.removeChannel(profileSub);
+        if (connSub) supabase.removeChannel(connSub);
+      }
+    };
   }, [loadProfiles, loadConnections, useSupabase]);
 
   // Save connections locally whenever they change
@@ -135,18 +160,14 @@ export function BuddyProvider({ children }) {
         if (!trip || !trip.destination || trip.status === 'completed') return false;
         const depDate = trip.departure_date || trip.departureDate;
         const rawDur = trip.duration || trip.trip_duration || '7 days';
-        const duration = typeof rawDur === 'string' && (rawDur.trim().startsWith('[') || rawDur.trim().startsWith('{'))
-          ? '7 days'
-          : rawDur;
+        const duration = formatTripDuration(rawDur);
         return matchesPreferenceDate(depDate, duration, null);
       })
       .map(trip => {
         const userId = trip.user_id || trip.userId;
         const profile = profiles[userId] || {};
         const rawDur = trip.duration || trip.trip_duration || '7 days';
-        const cleanDur = typeof rawDur === 'string' && (rawDur.trim().startsWith('[') || rawDur.trim().startsWith('{'))
-          ? '7 days'
-          : rawDur;
+        const cleanDur = formatTripDuration(rawDur);
 
         const resolvedName =
           (trip.user_name && trip.user_name !== 'Traveler' ? trip.user_name : null) ||
@@ -161,14 +182,24 @@ export function BuddyProvider({ children }) {
           trip.user_gender ||
           'other';
 
+        const rawAge = profile.age || trip.user_age || null;
+        const parsedAge = rawAge ? parseInt(rawAge, 10) : null;
+        const resolvedAge = parsedAge && !isNaN(parsedAge) && parsedAge > 0 ? parsedAge : null;
+
+        const rawCity =
+          (profile.city && profile.city !== 'Global Nomad' ? profile.city : null) ||
+          (trip.user_city && trip.user_city !== 'Global Nomad' ? trip.user_city : null) ||
+          '';
+        const resolvedCity = String(rawCity).trim();
+
         return {
           id: trip.id,
           tripId: trip.id,
           userId: userId,
           name: resolvedName,
-          age: profile.age || trip.user_age || 25,
+          age: resolvedAge,
           gender: resolvedGender,
-          city: profile.city || trip.user_city || 'Global Nomad',
+          city: resolvedCity,
           bio: profile.bio || trip.user_bio || 'Excited to explore with fellow travel buddies!',
           avatar: profile.avatar_url || profile.avatar || trip.user_avatar || null,
           avatar_url: profile.avatar_url || profile.avatar || trip.user_avatar || null,

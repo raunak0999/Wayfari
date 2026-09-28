@@ -36,7 +36,7 @@ function AppRoutes() {
       {!hideNavbar && <Navbar />}
       <Routes>
         <Route path="/" element={user ? <Navigate to="/find-buddies" replace /> : <LandingPage />} />
-        <Route path="/auth" element={user ? <Navigate to="/find-buddies" replace /> : <AuthPage />} />
+        <Route path="/auth" element={user ? <Navigate to={user.profileComplete === false ? "/profile-setup" : "/find-buddies"} replace /> : <AuthPage />} />
         <Route
           path="/profile-setup"
           element={

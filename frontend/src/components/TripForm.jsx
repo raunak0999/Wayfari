@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import './TripForm.css';
 
-export default function TripForm({ onSubmit, onClose }) {
+export default function TripForm({ onSubmit, onClose, defaultAge = '', defaultCity = '' }) {
   const [form, setForm] = useState({
     destination: '',
     departureDate: '',
     departureTime: '',
     duration: '',
     groupSize: '2',
-    travelStyle: 'Mid-range'
+    travelStyle: 'Mid-range',
+    age: defaultAge ? String(defaultAge) : '',
+    city: defaultCity && defaultCity !== 'Global Nomad' ? String(defaultCity) : '',
   });
 
   const handleChange = (field, value) => {
@@ -73,6 +75,31 @@ export default function TripForm({ onSubmit, onClose }) {
               onChange={e => handleChange('duration', e.target.value)}
               required
             />
+          </div>
+
+          <div className="trip-form__row">
+            <div className="form-group">
+              <label className="form-label">Your Age</label>
+              <input
+                className="form-input"
+                type="number"
+                min="18"
+                max="99"
+                placeholder="e.g., 22"
+                value={form.age}
+                onChange={e => handleChange('age', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Your City</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="e.g., Mumbai"
+                value={form.city}
+                onChange={e => handleChange('city', e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="form-group">

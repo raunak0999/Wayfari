@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTrips } from '../context/TripContext';
 import { useNavigate } from 'react-router-dom';
@@ -16,35 +16,62 @@ export default function ProfileWizard() {
 
   const [profile, setProfile] = useState({
     avatar: user?.profile?.avatar || '',
-    displayName: user?.name || '',
-    age: '',
-    city: '',
-    bio: '',
+    displayName: user?.profile?.displayName || user?.name || '',
+    age: user?.profile?.age || '',
+    city: user?.profile?.city && String(user.profile.city).toLowerCase() !== 'global nomad' ? user.profile.city : '',
+    bio: user?.profile?.bio || '',
   });
 
   const [preferences, setPreferences] = useState({
-    destination: '',
-    departureDate: '',
-    departureTime: '',
-    tripDuration: '',
-    groupSize: '2',
-    travelStyle: 'Mid-range',
-    travelExperience: 'beginner',
+    destination: user?.preferences?.destination || '',
+    departureDate: user?.preferences?.departureDate || '',
+    departureTime: user?.preferences?.departureTime || '',
+    tripDuration: user?.preferences?.tripDuration || '',
+    groupSize: user?.preferences?.groupSize || user?.groupSize || '2',
+    travelStyle: user?.preferences?.travelStyle || user?.travelStyle || 'Mid-range',
+    travelExperience: user?.travelExperience || user?.travel_experience || 'beginner',
   });
 
   const [interests, setInterests] = useState({
-    hobbies: [],
-    music: [],
-    buddyGender: 'Any',
-    noiseLevel: 'Moderate',
-    sleepSchedule: 'Flexible',
+    hobbies: user?.hobbies || user?.interests?.hobbies || [],
+    music: user?.music || user?.interests?.music || [],
+    buddyGender: user?.interests?.buddyGender || 'Any',
+    noiseLevel: user?.interests?.noiseLevel || 'Moderate',
+    sleepSchedule: user?.interests?.sleepSchedule || 'Flexible',
   });
 
   const [safety, setSafety] = useState({
     contacts: [{ name: '', phone: '', relationship: '' }],
-    sosEnabled: false,
-    checkInInterval: '2hr',
+    sosEnabled: user?.safety?.sosEnabled || false,
+    checkInInterval: user?.safety?.checkInInterval || '2hr',
   });
+
+  useEffect(() => {
+    if (!user) return;
+    setProfile(prev => ({
+      avatar: prev.avatar || user.profile?.avatar || '',
+      displayName: prev.displayName || user.profile?.displayName || user.name || '',
+      age: prev.age || user.profile?.age || '',
+      city: prev.city || (user.profile?.city && String(user.profile.city).toLowerCase() !== 'global nomad' ? user.profile.city : ''),
+      bio: prev.bio || user.profile?.bio || '',
+    }));
+    setPreferences(prev => ({
+      destination: prev.destination || user.preferences?.destination || '',
+      departureDate: prev.departureDate || user.preferences?.departureDate || '',
+      departureTime: prev.departureTime || user.preferences?.departureTime || '',
+      tripDuration: prev.tripDuration || user.preferences?.tripDuration || '',
+      groupSize: prev.groupSize !== '2' ? prev.groupSize : (user.preferences?.groupSize || user.groupSize || '2'),
+      travelStyle: prev.travelStyle !== 'Mid-range' ? prev.travelStyle : (user.preferences?.travelStyle || user.travelStyle || 'Mid-range'),
+      travelExperience: prev.travelExperience !== 'beginner' ? prev.travelExperience : (user.travelExperience || user.travel_experience || 'beginner'),
+    }));
+    setInterests(prev => ({
+      hobbies: prev.hobbies.length > 0 ? prev.hobbies : (user.hobbies || user.interests?.hobbies || []),
+      music: prev.music.length > 0 ? prev.music : (user.music || user.interests?.music || []),
+      buddyGender: prev.buddyGender !== 'Any' ? prev.buddyGender : (user.interests?.buddyGender || 'Any'),
+      noiseLevel: prev.noiseLevel !== 'Moderate' ? prev.noiseLevel : (user.interests?.noiseLevel || 'Moderate'),
+      sleepSchedule: prev.sleepSchedule !== 'Flexible' ? prev.sleepSchedule : (user.interests?.sleepSchedule || 'Flexible'),
+    }));
+  }, [user]);
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files[0];
@@ -129,6 +156,22 @@ export default function ProfileWizard() {
     navigate('/find-buddies');
   };
 
+  const handleSaveProfileOnly = async () => {
+    await updateProfile({
+      profileComplete: true,
+      profile,
+      preferences,
+      interests,
+      hobbies: interests.hobbies,
+      music: interests.music,
+      travelStyle: preferences.travelStyle,
+      groupSize: preferences.groupSize,
+      travelExperience: preferences.travelExperience,
+      safety: isFemale ? safety : undefined,
+    });
+    navigate('/find-buddies');
+  };
+
   const canNext = () => {
     switch (step) {
       case 1: return profile.displayName && profile.age && profile.city;
@@ -204,7 +247,7 @@ export default function ProfileWizard() {
                 type="number"
                 min="18"
                 max="99"
-                placeholder="25"
+                placeholder="e.g., 22"
                 value={profile.age}
                 onChange={e => setProfile(prev => ({ ...prev, age: e.target.value }))}
               />
@@ -508,6 +551,15 @@ export default function ProfileWizard() {
           </button>
         )}
         <div style={{ flex: 1 }} />
+        {step === 1 && profile.displayName && profile.age && profile.city && (
+          <button
+            className="btn btn--outline"
+            onClick={handleSaveProfileOnly}
+            style={{ marginRight: '8px' }}
+          >
+            Save Profile ✓
+          </button>
+        )}
         {step < totalSteps ? (
           <button
             className="btn btn--primary"

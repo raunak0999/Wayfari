@@ -49,6 +49,7 @@ const mergeProfileObjects = (...sources) => {
     if (!src || typeof src !== 'object') continue;
     for (const [k, v] of Object.entries(src)) {
       if (v === null || v === undefined || v === '') continue;
+      if (k === 'city' && v === 'Global Nomad') continue;
       if (Array.isArray(v) && v.length === 0 && Array.isArray(result[k]) && result[k].length > 0) {
         continue;
       }
@@ -61,6 +62,7 @@ const mergeProfileObjects = (...sources) => {
       result[k] = v;
     }
   }
+  if (result.city === 'Global Nomad') result.city = '';
   return result;
 };
 
@@ -103,6 +105,9 @@ export function AuthProvider({ children }) {
       const merged = mergeProfileObjects(baseFallback, data && !error ? data : null, metaProf, localProf);
       if (!merged.hobbies) merged.hobbies = [];
       if (!merged.music) merged.music = [];
+      if (merged.destination || merged.age || merged.city || (merged.trip_duration && merged.trip_duration !== '[]')) {
+        merged.profile_complete = true;
+      }
 
       const updatedLocal = getStoredProfiles();
       updatedLocal[userId] = merged;
@@ -114,6 +119,9 @@ export function AuthProvider({ children }) {
       const merged = mergeProfileObjects(baseFallback, metaProf, localProf);
       if (!merged.hobbies) merged.hobbies = [];
       if (!merged.music) merged.music = [];
+      if (merged.destination || merged.age || merged.city || (merged.trip_duration && merged.trip_duration !== '[]')) {
+        merged.profile_complete = true;
+      }
       setProfile(merged);
       return merged;
     }
@@ -131,13 +139,18 @@ export function AuthProvider({ children }) {
     if (useSupabase) {
       // Supabase flow
       supabase.auth.getSession()
-        .then(({ data: { session } }) => {
+        .then(async ({ data: { session } }) => {
           if (!mounted) return;
           if (session?.user) {
+            const cachedLocal = getStoredProfiles()[session.user.id];
+            const cachedMeta = session.user.user_metadata?.wayfari_profile;
+            if (cachedLocal || cachedMeta) {
+              setProfile(mergeProfileObjects(cachedMeta, cachedLocal));
+            }
             setUser(session.user);
-            loadProfile(session.user.id, session.user);
+            await loadProfile(session.user.id, session.user);
           }
-          setLoading(false);
+          if (mounted) setLoading(false);
           clearTimeout(safetyTimer);
         })
         .catch(err => {
@@ -152,6 +165,18 @@ export function AuthProvider({ children }) {
           async (event, session) => {
             if (!mounted) return;
             if (session?.user) {
+              const cachedLocal = getStoredProfiles()[session.user.id];
+              const cachedMeta = session.user.user_metadata?.wayfari_profile;
+              const seedProf = mergeProfileObjects({
+                id: session.user.id,
+                name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Traveler',
+                email: session.user.email || '',
+                gender: session.user.user_metadata?.gender || 'other',
+                profile_complete: event === 'SIGNED_IN' && !cachedLocal && !cachedMeta ? false : (cachedLocal?.profile_complete ?? cachedMeta?.profile_complete ?? false),
+                hobbies: [],
+                music: [],
+              }, cachedMeta, cachedLocal);
+              setProfile(prev => prev && prev.id === session.user.id ? mergeProfileObjects(seedProf, prev) : seedProf);
               setUser(session.user);
               try {
                 // Ensure profile exists (especially for Google Sign-In)
@@ -241,20 +266,29 @@ export function AuthProvider({ children }) {
               name,
               email,
               gender: gender.toLowerCase(),
-              profile_complete: false
+              profile_complete: false,
+              hobbies: [],
+              music: [],
             };
 
             const localProfiles = getStoredProfiles();
             localProfiles[data.user.id] = initialProf;
             setStoredProfiles(localProfiles);
+            setProfile(initialProf);
+            setUser(data.user);
 
-            const { error: profileError } = await supabase.from('profiles').upsert(initialProf);
+            const { error: profileError } = await supabase.from('profiles').upsert({
+              id: data.user.id,
+              name,
+              email,
+              gender: gender.toLowerCase(),
+              profile_complete: false,
+            });
 
             if (profileError) {
               console.error('Profile creation error:', profileError);
             }
 
-            setUser(data.user);
             await loadProfile(data.user.id, data.user);
           } else {
             // Email confirmation is required by Supabase
@@ -295,8 +329,8 @@ export function AuthProvider({ children }) {
     profiles[userId] = newProfile;
     setStoredProfiles(profiles);
     setStoredAuth({ id: userId, email, name, gender: gender.toLowerCase() });
-    setUser({ id: userId, email, user_metadata: { name, gender: gender.toLowerCase() } });
     setProfile(newProfile);
+    setUser({ id: userId, email, user_metadata: { name, gender: gender.toLowerCase() } });
 
     return { success: true };
   };
@@ -324,8 +358,8 @@ export function AuthProvider({ children }) {
           return { success: false, error: msg };
         }
 
-        setUser(data.user);
         await loadProfile(data.user.id, data.user);
+        setUser(data.user);
         return { success: true };
       } catch (err) {
         return { success: false, error: getErrorMessage(err) };
@@ -388,14 +422,21 @@ export function AuthProvider({ children }) {
   const updateProfile = async (updates) => {
     if (!user) return;
 
-    const currentProfile = profile || {};
+    const storedForUser = getStoredProfiles()[user.id] || {};
+    const currentProfile = mergeProfileObjects(storedForUser, profile || {});
     const merged = { ...currentProfile, id: user.id };
 
     if (updates.profile) {
-      if (updates.profile.displayName) merged.name = updates.profile.displayName;
-      if (updates.profile.age) merged.age = parseInt(updates.profile.age, 10);
-      if (updates.profile.city) merged.city = updates.profile.city;
-      if (updates.profile.bio) merged.bio = updates.profile.bio;
+      if (updates.profile.displayName) merged.name = String(updates.profile.displayName).trim();
+      if (updates.profile.age !== undefined && updates.profile.age !== '') {
+        const parsedAge = parseInt(updates.profile.age, 10);
+        if (!isNaN(parsedAge) && parsedAge > 0) merged.age = parsedAge;
+      }
+      if (updates.profile.city !== undefined) {
+        const cleanCity = String(updates.profile.city || '').trim();
+        merged.city = cleanCity.toLowerCase() === 'global nomad' ? '' : cleanCity;
+      }
+      if (updates.profile.bio !== undefined) merged.bio = updates.profile.bio;
       if (updates.profile.avatar) merged.avatar_url = updates.profile.avatar;
     }
 
@@ -435,6 +476,35 @@ export function AuthProvider({ children }) {
     setStoredProfiles(localProfiles);
     setProfile(merged);
 
+    // Also stamp updated age/city/name/bio onto own stored trips so TripContext immediately syncs them
+    try {
+      const storedTrips = JSON.parse(localStorage.getItem('wayfari_trips')) || [];
+      let tripsChanged = false;
+      const updatedTrips = storedTrips.map(t => {
+        if (!t) return t;
+        const tUid = t.user_id || t.userId;
+        if (tUid === user.id) {
+          tripsChanged = true;
+          return {
+            ...t,
+            user_name: merged.name || t.user_name || 'Traveler',
+            user_age: merged.age || t.user_age || null,
+            user_city: merged.city || (t.user_city && String(t.user_city).toLowerCase() !== 'global nomad' ? t.user_city : '') || '',
+            user_bio: merged.bio || t.user_bio || '',
+            user_gender: merged.gender || t.user_gender || 'other',
+            user_hobbies: merged.hobbies && merged.hobbies.length > 0 ? merged.hobbies : (t.user_hobbies || []),
+            user_music: merged.music && merged.music.length > 0 ? merged.music : (t.user_music || []),
+          };
+        }
+        return t;
+      });
+      if (tripsChanged) {
+        localStorage.setItem('wayfari_trips', JSON.stringify(updatedTrips));
+      }
+    } catch { /* ignore */ }
+
+    window.dispatchEvent(new CustomEvent('wayfari:profile-updated', { detail: merged }));
+
     // 2. Sync to Supabase (`profiles` table + Auth `user_metadata`)
     if (useSupabase) {
       try {
@@ -454,7 +524,8 @@ export function AuthProvider({ children }) {
         if (merged.name) dbUpdates.name = merged.name;
         if (merged.age) dbUpdates.age = merged.age;
         if (merged.city) dbUpdates.city = merged.city;
-        if (merged.avatar_url) dbUpdates.avatar_url = merged.avatar_url;
+        if (merged.bio) dbUpdates.bio = merged.bio;
+        if (merged.avatar_url && String(merged.avatar_url).length <= 8192) dbUpdates.avatar_url = merged.avatar_url;
         if (merged.destination) dbUpdates.destination = merged.destination;
         if (merged.departure_date && /^\d{4}-\d{2}-\d{2}$/.test(String(merged.departure_date))) {
           dbUpdates.departure_date = merged.departure_date;
@@ -473,16 +544,37 @@ export function AuthProvider({ children }) {
         if (merged.profile_complete !== undefined) dbUpdates.profile_complete = merged.profile_complete;
 
         if (Object.keys(dbUpdates).length > 0) {
-          const { data: updatedRow, error } = await supabase
+          let { data: updatedRow, error } = await supabase
             .from('profiles')
             .update(dbUpdates)
             .eq('id', user.id)
             .select()
             .maybeSingle();
 
-          if (error) {
-            console.warn('Profile update error:', error);
-          } else if (updatedRow) {
+          if (error || !updatedRow) {
+            const coreDbUpdates = {
+              id: user.id,
+              name: merged.name || user.user_metadata?.name || 'Traveler',
+              email: merged.email || user.email || null,
+              gender: merged.gender || user.user_metadata?.gender || 'other',
+              profile_complete: merged.profile_complete ?? true,
+            };
+            if (merged.age) coreDbUpdates.age = merged.age;
+            if (merged.city) coreDbUpdates.city = merged.city;
+            if (merged.bio) coreDbUpdates.bio = merged.bio;
+
+            const retryUpsert = await supabase
+              .from('profiles')
+              .upsert(coreDbUpdates, { onConflict: 'id' })
+              .select()
+              .maybeSingle();
+
+            if (!retryUpsert.error && retryUpsert.data) {
+              updatedRow = retryUpsert.data;
+            }
+          }
+
+          if (updatedRow) {
             const combinedRow = mergeProfileObjects(updatedRow, merged);
             const refreshedLocal = getStoredProfiles();
             refreshedLocal[user.id] = combinedRow;
@@ -490,6 +582,8 @@ export function AuthProvider({ children }) {
             setProfile(combinedRow);
           }
         }
+
+        window.dispatchEvent(new CustomEvent('wayfari:profile-updated', { detail: merged }));
 
         // Handle safety contacts separately
         if (updates.safety?.contacts?.length > 0) {
@@ -578,8 +672,13 @@ export function AuthProvider({ children }) {
     name: user.user_metadata?.name || '',
     email: user.email,
     gender: user.user_metadata?.gender,
-    profileComplete: false,
-    profile: {},
+    profileComplete: getStoredProfiles()[user.id]?.profile_complete ?? user.user_metadata?.wayfari_profile?.profile_complete ?? false,
+    profile: {
+      displayName: user.user_metadata?.name || '',
+      age: getStoredProfiles()[user.id]?.age || user.user_metadata?.wayfari_profile?.age || undefined,
+      city: getStoredProfiles()[user.id]?.city || user.user_metadata?.wayfari_profile?.city || undefined,
+      bio: getStoredProfiles()[user.id]?.bio || user.user_metadata?.wayfari_profile?.bio || undefined,
+    },
     preferences: {},
     interests: { hobbies: [], music: [] },
     hobbies: [],

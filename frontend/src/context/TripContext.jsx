@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { getTripEndDate } from '../utils/tripUtils';
+import { getTripEndDate, formatTripDuration } from '../utils/tripUtils';
 
 const TripContext = createContext(null);
 const TRIPS_KEY = 'wayfari_trips';
@@ -12,9 +12,25 @@ const TRIP_SYNC_PREFIX = '__WAYFARI_TRIP_SYNC__:';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUUID = (val) => Boolean(val && UUID_REGEX.test(String(val)));
 
+const sanitizeStoredTrip = (t) => {
+  if (!t || typeof t !== 'object') return t;
+  const dur = formatTripDuration(t.duration || t.trip_duration || '7 days');
+  const rawCity = t.user_city && String(t.user_city).trim().toLowerCase() !== 'global nomad'
+    ? String(t.user_city).trim()
+    : '';
+  return {
+    ...t,
+    duration: dur,
+    trip_duration: dur,
+    user_city: rawCity,
+  };
+};
+
 const getStoredTrips = () => {
-  try { return JSON.parse(localStorage.getItem(TRIPS_KEY)) || []; }
-  catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(TRIPS_KEY)) || [];
+    return Array.isArray(raw) ? raw.map(sanitizeStoredTrip) : [];
+  } catch { return []; }
 };
 
 const saveStoredTrips = (trips) => {
@@ -23,8 +39,20 @@ const saveStoredTrips = (trips) => {
 };
 
 const getStoredPeerTrips = () => {
-  try { return JSON.parse(localStorage.getItem(PEER_TRIPS_KEY)) || {}; }
-  catch { return {}; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(PEER_TRIPS_KEY)) || {};
+    if (!raw || typeof raw !== 'object') return {};
+    const cleaned = {};
+    for (const [uid, entry] of Object.entries(raw)) {
+      if (entry && typeof entry === 'object') {
+        cleaned[uid] = {
+          ...entry,
+          trips: Array.isArray(entry.trips) ? entry.trips.map(sanitizeStoredTrip) : [],
+        };
+      }
+    }
+    return cleaned;
+  } catch { return {}; }
 };
 
 const saveStoredPeerTrips = (peerMap) => {
@@ -47,22 +75,7 @@ const getStoredLocalProfiles = () => {
   catch { return {}; }
 };
 
-const getCleanDuration = (dur) => {
-  if (!dur) return '7 days';
-  if (typeof dur === 'string') {
-    const trimmed = dur.trim();
-    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) return parsed[0]?.duration || '7 days';
-        if (parsed && typeof parsed === 'object') return parsed.duration || '7 days';
-      } catch {
-        return '7 days';
-      }
-    }
-  }
-  return dur;
-};
+const getCleanDuration = (dur) => formatTripDuration(dur);
 
 const makeTripDedupKey = (userId, destination, depDate) => {
   const cleanDest = String(destination || '').toLowerCase().trim();
@@ -165,6 +178,26 @@ export function TripProvider({ children }) {
       (Array.isArray(metaProf.music) && metaProf.music.length > 0 ? metaProf.music : null) ||
       (Array.isArray(dbProf.music) && dbProf.music.length > 0 ? dbProf.music : []);
 
+    const cleanCityVal = (val) => (val && val !== 'Global Nomad' ? String(val).trim() : '');
+    const resolvedCity =
+      cleanCityVal(localProf.city) ||
+      cleanCityVal(metaProf.city) ||
+      cleanCityVal(dbProf.city) ||
+      cleanCityVal(t.user_city) ||
+      '';
+
+    const cleanAgeVal = (val) => {
+      if (!val) return null;
+      const n = parseInt(val, 10);
+      return !isNaN(n) && n > 0 ? n : null;
+    };
+    const resolvedAge =
+      cleanAgeVal(localProf.age) ||
+      cleanAgeVal(metaProf.age) ||
+      cleanAgeVal(dbProf.age) ||
+      cleanAgeVal(t.user_age) ||
+      null;
+
     return {
       ...t,
       id: t.id || `trip_${uid || 'anon'}_${String(t.destination || '').toLowerCase().trim()}_${depDate || 'any'}`,
@@ -184,13 +217,13 @@ export function TripProvider({ children }) {
       created_at: t.created_at || dbProf.created_at || new Date().toISOString(),
       user_name: resolvedName,
       user_avatar: t.user_avatar || localProf.avatar_url || metaProf.avatar_url || dbProf.avatar_url || null,
-      user_city: t.user_city || localProf.city || metaProf.city || dbProf.city || '',
-      user_age: t.user_age || localProf.age || metaProf.age || dbProf.age || null,
+      user_city: resolvedCity,
+      user_age: resolvedAge,
       user_gender: resolvedGender,
       user_experience: t.user_experience || localProf.travel_experience || metaProf.travel_experience || dbProf.travel_experience || 'intermediate',
       user_hobbies: resolvedHobbies,
       user_music: resolvedMusic,
-      user_bio: t.user_bio || localProf.bio || metaProf.bio || dbProf.bio || '',
+      user_bio: localProf.bio || metaProf.bio || dbProf.bio || t.user_bio || '',
     };
   }, []);
 
@@ -545,8 +578,8 @@ export function TripProvider({ children }) {
       // Sort newest first
       uniqueTrips.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      // Update signature so polling doesn't repeat identical syncs
-      const sig = `${userId}:${JSON.stringify(uniqueTrips.map(t => `${t.destination}_${t.departure_date}_${t.duration}_${t.status}`))}`;
+      // Update signature so polling doesn't repeat identical syncs, while re-syncing if name/age/city changes
+      const sig = `${userId}:${JSON.stringify(uniqueTrips.map(t => `${t.destination}_${t.departure_date}_${t.duration}_${t.status}_${t.user_name || ''}_${t.user_age || ''}_${t.user_city || ''}`))}`;
       lastSyncedSignatureRef.current = sig;
 
       const latest = uniqueTrips[0] || null;
@@ -554,8 +587,16 @@ export function TripProvider({ children }) {
       const validDate = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(String(rawDate)) ? rawDate : null;
       const deletedKeysList = Array.from(deletedTripsRef.current);
 
-      // Channel 1: Update `public.profiles` row (with upsert fallback if row missing)
-      const profilePayload = {
+      const localProfiles = getStoredLocalProfiles();
+      const myLocalProf = localProfiles[userId] || {};
+      const myMetaProf = authUser?.user_metadata?.wayfari_profile || {};
+      const syncedAge = latest?.user_age || myLocalProf.age || myMetaProf.age || null;
+      const rawSyncedCity = latest?.user_city || myLocalProf.city || myMetaProf.city || '';
+      const syncedCity = rawSyncedCity && rawSyncedCity !== 'Global Nomad' ? String(rawSyncedCity).trim() : '';
+      const syncedBio = latest?.user_bio || myLocalProf.bio || myMetaProf.bio || '';
+
+      // Channel 1: Update `public.profiles` row (with core fallback and upsert fallback if row missing)
+      const coreProfilePayload = {
         destination: latest ? latest.destination : null,
         departure_date: validDate,
         trip_duration: JSON.stringify(uniqueTrips),
@@ -564,11 +605,26 @@ export function TripProvider({ children }) {
         profile_complete: true,
       };
 
-      const { data: updatedProf } = await supabase
+      const fullProfilePayload = { ...coreProfilePayload };
+      if (latest?.user_name && latest.user_name !== 'Traveler') fullProfilePayload.name = latest.user_name;
+      if (syncedAge) fullProfilePayload.age = parseInt(syncedAge, 10);
+      if (syncedCity) fullProfilePayload.city = syncedCity;
+      if (syncedBio) fullProfilePayload.bio = syncedBio;
+
+      let { data: updatedProf, error: updProfErr } = await supabase
         .from('profiles')
-        .update(profilePayload)
+        .update(fullProfilePayload)
         .eq('id', userId)
         .select();
+
+      if (updProfErr) {
+        const retryCore = await supabase
+          .from('profiles')
+          .update(coreProfilePayload)
+          .eq('id', userId)
+          .select();
+        updatedProf = retryCore.data;
+      }
 
       if (!updatedProf || updatedProf.length === 0) {
         await supabase
@@ -578,7 +634,7 @@ export function TripProvider({ children }) {
             name: latest?.user_name || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || 'Traveler',
             email: authUser?.email || null,
             gender: latest?.user_gender || 'other',
-            ...profilePayload,
+            ...fullProfilePayload,
           }, { onConflict: 'id' });
       }
 
@@ -864,7 +920,7 @@ export function TripProvider({ children }) {
         ...dbTripsRows,
         ...authMetaTrips,
       ];
-      const seenCloudKeys = new Set();
+      const cloudMap = new Map();
       for (const ct of combinedCloud) {
         if (!ct || !ct.destination || ct.status === 'completed') continue;
         const ownerUid = ct.user_id || ct.userId;
@@ -889,11 +945,24 @@ export function TripProvider({ children }) {
         }
 
         const key = makeTripDedupKey(ownerUid, ct.destination, dep);
-        if (!seenCloudKeys.has(key)) {
-          seenCloudKeys.add(key);
-          cloudTrips.push(enrichTripWithProfile(ct, ownerUid, profilesById, currentAuthUser));
+        const enriched = enrichTripWithProfile(ct, ownerUid, profilesById, currentAuthUser);
+        if (!cloudMap.has(key)) {
+          cloudMap.set(key, enriched);
+        } else {
+          const existing = cloudMap.get(key);
+          cloudMap.set(key, {
+            ...existing,
+            user_name: (existing.user_name && existing.user_name !== 'Traveler' ? existing.user_name : null) || enriched.user_name || 'Traveler',
+            user_age: existing.user_age || enriched.user_age || null,
+            user_city: existing.user_city || enriched.user_city || '',
+            user_bio: existing.user_bio || enriched.user_bio || '',
+            user_avatar: existing.user_avatar || enriched.user_avatar || null,
+            user_hobbies: existing.user_hobbies && existing.user_hobbies.length > 0 ? existing.user_hobbies : (enriched.user_hobbies || []),
+            user_music: existing.user_music && existing.user_music.length > 0 ? existing.user_music : (enriched.user_music || []),
+          });
         }
       }
+      cloudTrips = Array.from(cloudMap.values());
     }
 
     // 8. Merge cloudTrips with local trips immediately so UI updates before background syncs
@@ -988,7 +1057,7 @@ export function TripProvider({ children }) {
         const peerCount = profilesList.filter(p => p && isUUID(p.id) && p.id !== currentAuthUserId).length;
         const peerCountIncreased = peerCount > lastSyncedPeerCountRef.current;
 
-        const currentSig = `${currentAuthUserId}:${JSON.stringify(myUniqueTrips.map(t => `${t.destination}_${t.departure_date}_${t.duration}_${t.status}`))}`;
+        const currentSig = `${currentAuthUserId}:${JSON.stringify(myUniqueTrips.map(t => `${t.destination}_${t.departure_date}_${t.duration}_${t.status}_${t.user_name || ''}_${t.user_age || ''}_${t.user_city || ''}`))}`;
 
         // Ensure Realtime channel always tracks own active trips once subscribed
         if (myUniqueTrips.length > 0 && realtimeChannelRef.current && lastRealtimeTrackedSigRef.current !== currentSig) {
@@ -1011,30 +1080,52 @@ export function TripProvider({ children }) {
         if (myUniqueTrips.length > 0 && (lastSyncedSignatureRef.current !== currentSig || peerCountIncreased || (hasUnsyncedToProfile && !lastSyncedSignatureRef.current))) {
           await syncTripsToProfile(currentAuthUserId, myUniqueTrips);
 
-          // Also ensure each own trip exists in `public.trips` table
-          const myDbKeys = new Set(
-            dbTripsRows
-              .filter(dt => (dt.user_id || dt.userId) === currentAuthUserId)
-              .map(dt => makeDestDateKey(dt.destination, dt.departure_date || dt.departureDate || ''))
-          );
+          // Also ensure each own trip exists and has up-to-date traveler metadata in `public.trips` table
+          const myDbMap = new Map();
+          for (const dt of dbTripsRows) {
+            if ((dt.user_id || dt.userId) === currentAuthUserId) {
+              const k = makeDestDateKey(dt.destination, dt.departure_date || dt.departureDate || '');
+              myDbMap.set(k, dt);
+            }
+          }
           for (const mt of myUniqueTrips) {
             const mk = makeDestDateKey(mt.destination, mt.departure_date || mt.departureDate || '');
-            if (!myDbKeys.has(mk)) {
-              await insertTripIntoDb(currentAuthUserId, mt, {
-                duration: mt.duration || '7 days',
-                group_size: mt.group_size || '2',
-                travel_style: mt.travel_style || 'Mid-range',
-                status: mt.status || 'active',
-                created_at: mt.created_at,
-                user_name: mt.user_name,
-                user_city: mt.user_city,
-                user_age: mt.user_age,
-                user_gender: mt.user_gender,
-                user_experience: mt.user_experience,
-                user_hobbies: mt.user_hobbies,
-                user_music: mt.user_music,
-                user_bio: mt.user_bio,
-              });
+            const fullMeta = {
+              duration: mt.duration || '7 days',
+              group_size: mt.group_size || '2',
+              travel_style: mt.travel_style || 'Mid-range',
+              status: mt.status || 'active',
+              created_at: mt.created_at,
+              user_name: mt.user_name,
+              user_city: mt.user_city,
+              user_age: mt.user_age,
+              user_gender: mt.user_gender,
+              user_experience: mt.user_experience,
+              user_hobbies: mt.user_hobbies,
+              user_music: mt.user_music,
+              user_bio: mt.user_bio,
+            };
+            const existingDbRow = myDbMap.get(mk);
+            if (!existingDbRow) {
+              await insertTripIntoDb(currentAuthUserId, mt, fullMeta);
+            } else if (
+              isUUID(existingDbRow.id) &&
+              (existingDbRow.user_age !== mt.user_age ||
+               existingDbRow.user_city !== mt.user_city ||
+               existingDbRow.user_name !== mt.user_name)
+            ) {
+              try {
+                const { error: titleUpdErr } = await supabase
+                  .from('trips')
+                  .update({ title: JSON.stringify(fullMeta) })
+                  .eq('id', existingDbRow.id);
+                if (titleUpdErr) {
+                  await supabase
+                    .from('trips')
+                    .update({ duration: JSON.stringify(fullMeta) })
+                    .eq('id', existingDbRow.id);
+                }
+              } catch { /* ignore */ }
             }
           }
         }
@@ -1049,9 +1140,34 @@ export function TripProvider({ children }) {
   useEffect(() => {
     loadTrips(false);
 
-    // Refresh when window regains focus
+    // Refresh when window regains focus or profile is updated
     const handleFocus = () => loadTrips(true);
+    const handleProfileUpdated = (e) => {
+      const updatedProf = e?.detail;
+      const profUid = updatedProf?.id || currentUserIdRef.current;
+      lastSyncedSignatureRef.current = '';
+      lastRealtimeTrackedSigRef.current = '';
+
+      if (profUid) {
+        const baseList = tripsRef.current && tripsRef.current.length > 0 ? tripsRef.current : getStoredTrips();
+        const profilesMap = updatedProf ? { [profUid]: updatedProf } : {};
+        const reEnriched = baseList.map(t => {
+          if (!t) return t;
+          const tUid = t.user_id || t.userId;
+          if (tUid === profUid) {
+            return enrichTripWithProfile(t, profUid, profilesMap);
+          }
+          return t;
+        });
+        setTripsAndPersist(reEnriched);
+        if (useSupabase && isUUID(profUid)) {
+          syncTripsToProfile(profUid, reEnriched);
+        }
+      }
+      loadTrips(true);
+    };
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('wayfari:profile-updated', handleProfileUpdated);
 
     // Poll every 8 seconds so new trips posted by any user appear live at the top of Find Buddies
     const pollInterval = setInterval(() => {
@@ -1195,6 +1311,7 @@ export function TripProvider({ children }) {
 
     return () => {
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('wayfari:profile-updated', handleProfileUpdated);
       clearInterval(pollInterval);
       if (authSub) authSub.unsubscribe();
       if (dbChannel && useSupabase) {
@@ -1205,7 +1322,7 @@ export function TripProvider({ children }) {
         supabase.removeChannel(globalSyncChannel);
       }
     };
-  }, [loadTrips, useSupabase, applyIncomingPeerTrips]);
+  }, [loadTrips, useSupabase, applyIncomingPeerTrips, enrichTripWithProfile, setTripsAndPersist, syncTripsToProfile]);
 
   const addTrip = useCallback(async (trip) => {
     const departureDateRaw = trip.departureDate || trip.departure_date || null;

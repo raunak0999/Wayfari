@@ -129,3 +129,58 @@ export function formatTripDate(dateStr) {
     return String(dateStr);
   }
 }
+
+/**
+ * Formats a raw duration value into a human-friendly label:
+ * - Unwraps JSON-encoded duration strings if present
+ * - Formats pure numbers (e.g. 10, "10", "2", "1") into "10 days", "2 days", "1 day"
+ * - Preserves strings that already include units (e.g. "7 days", "2 weeks", "Weekend")
+ */
+export function formatTripDuration(duration) {
+  if (duration === null || duration === undefined || duration === '') return '7 days';
+  if (typeof duration === 'number') {
+    if (isNaN(duration) || duration <= 0) return '7 days';
+    return duration === 1 ? '1 day' : `${duration} days`;
+  }
+
+  let str = String(duration).trim();
+  if (!str) return '7 days';
+
+  if (str.startsWith('[') || str.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        return formatTripDuration(parsed[0]?.duration || parsed[0]?.trip_duration || '7 days');
+      } else if (parsed && typeof parsed === 'object') {
+        return formatTripDuration(parsed.duration || parsed.trip_duration || '7 days');
+      }
+    } catch {
+      return '7 days';
+    }
+  }
+
+  if (/^\d+$/.test(str)) {
+    const num = parseInt(str, 10);
+    if (isNaN(num) || num <= 0) return '7 days';
+    return num === 1 ? '1 day' : `${num} days`;
+  }
+
+  const dayMatch = str.match(/^(\d+)\s*d(?:ays?)?$/i);
+  if (dayMatch) {
+    const num = parseInt(dayMatch[1], 10);
+    if (!isNaN(num) && num > 0) {
+      return num === 1 ? '1 day' : `${num} days`;
+    }
+  }
+
+  const weekMatch = str.match(/^(\d+)\s*w(?:ks?|eeks?)?$/i);
+  if (weekMatch) {
+    const num = parseInt(weekMatch[1], 10);
+    if (!isNaN(num) && num > 0) {
+      return num === 1 ? '1 week' : `${num} weeks`;
+    }
+  }
+
+  return str;
+}
+

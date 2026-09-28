@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBuddies } from '../context/BuddyContext';
-import { formatTripDate } from '../utils/tripUtils';
+import { formatTripDate, formatTripDuration } from '../utils/tripUtils';
 import './BuddyCard.css';
 
 const AVATAR_COLORS = [
@@ -32,6 +32,14 @@ export default function BuddyCard({ buddy, showConnect = true }) {
   const buddyDest = buddy.destination || '';
   const colorIdx = String(buddy.id);
   const colorIndex = colorIdx.charCodeAt(colorIdx.length - 1) % AVATAR_COLORS.length;
+
+  const cleanCity = buddy.city && buddy.city !== 'Global Nomad' ? String(buddy.city).trim() : '';
+  const parsedAge = buddy.age ? parseInt(buddy.age, 10) : null;
+  const cleanAge = parsedAge && !isNaN(parsedAge) && parsedAge > 0 ? parsedAge : null;
+  const metaParts = [];
+  if (cleanAge) metaParts.push(`${cleanAge} yrs`);
+  if (cleanCity) metaParts.push(cleanCity);
+  const metaSubtitle = metaParts.length > 0 ? metaParts.join(' · ') : 'Verified Traveler';
 
   const handleConnect = (e) => {
     e.stopPropagation();
@@ -101,7 +109,7 @@ export default function BuddyCard({ buddy, showConnect = true }) {
         <div className="buddy-card__info">
           <h4 className="buddy-card__name">{buddy.name}</h4>
           <p className="buddy-card__meta">
-            {buddy.age ? `${buddy.age} yrs` : 'Traveler'} {buddy.city ? `· ${buddy.city}` : ''}
+            {metaSubtitle}
           </p>
         </div>
       </div>
@@ -128,7 +136,7 @@ export default function BuddyCard({ buddy, showConnect = true }) {
         flexWrap: 'wrap'
       }}>
         <span>📅 {formatTripDate(buddy.departure_date)}</span>
-        <span>⏱️ {buddy.trip_duration || buddy.duration || '7 days'}</span>
+        <span>⏱️ {formatTripDuration(buddy.trip_duration || buddy.duration)}</span>
       </div>
 
       {/* Group & Style tags */}

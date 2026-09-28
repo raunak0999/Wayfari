@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBuddies } from '../context/BuddyContext';
 import { useChat } from '../context/ChatContext';
-import { formatTripDate } from '../utils/tripUtils';
+import { formatTripDate, formatTripDuration } from '../utils/tripUtils';
 import './BuddyProfilePage.css';
 
 const AVATAR_COLORS = [
@@ -54,11 +54,15 @@ export default function BuddyProfilePage() {
   const buddyAvatar = buddy.avatar || buddy.avatar_url;
   const buddyDest = buddy.destination || '';
   const buddyDepartureDate = buddy.departure_date || buddy.departureDate || 'Flexible';
-  const buddyDuration = buddy.trip_duration || buddy.tripDuration || buddy.duration || 'TBD';
+  const buddyDuration = formatTripDuration(buddy.trip_duration || buddy.tripDuration || buddy.duration);
   const buddyGroupSize = buddy.group_size || buddy.groupSize || '2';
   const buddyTravelStyle = buddy.travel_style || buddy.travelStyle || 'Mid-range';
   const buddyNoiseLevel = buddy.noise_level || buddy.noiseLevel || 'Moderate';
   const buddySleepSchedule = buddy.sleep_schedule || buddy.sleepSchedule || 'Flexible';
+
+  const parsedAge = buddy.age ? parseInt(buddy.age, 10) : null;
+  const cleanAge = parsedAge && !isNaN(parsedAge) && parsedAge > 0 ? parsedAge : null;
+  const cleanCity = buddy.city && buddy.city !== 'Global Nomad' ? String(buddy.city).trim() : '';
 
   const userHobbies = user?.hobbies || user?.interests?.hobbies || [];
   const userMusic = user?.music || user?.interests?.music || [];
@@ -103,8 +107,10 @@ export default function BuddyProfilePage() {
           </div>
 
           <div className="buddy-profile__info">
-            <h1>{buddy.name}, {buddy.age}</h1>
-            <p className="buddy-profile__location">📍 {buddy.city}</p>
+            <h1>{buddy.name}{cleanAge ? `, ${cleanAge}` : ''}</h1>
+            <p className="buddy-profile__location">
+              {cleanCity ? `📍 ${cleanCity}` : `✈️ Heading to ${buddyDest || 'Upcoming Adventure'}`}
+            </p>
             <p className="buddy-profile__bio">{buddy.bio}</p>
 
             <div className="buddy-profile__compat">
