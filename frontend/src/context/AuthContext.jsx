@@ -397,29 +397,30 @@ export function AuthProvider({ children }) {
       merged.checkin_interval = updates.safety.checkInInterval ?? '2hr';
     }
 
-    // ── Supabase update ──
+    // ── Supabase update (only columns that exist in live profiles table) ──
     if (useSupabase) {
       const dbUpdates = {};
       if (merged.name && merged.name !== currentProfile.name) dbUpdates.name = merged.name;
       if (merged.age) dbUpdates.age = merged.age;
       if (merged.city) dbUpdates.city = merged.city;
-      if (merged.bio) dbUpdates.bio = merged.bio;
       if (merged.avatar_url) dbUpdates.avatar_url = merged.avatar_url;
       if (merged.destination) dbUpdates.destination = merged.destination;
-      if (merged.departure_date) dbUpdates.departure_date = merged.departure_date;
-      if (merged.departure_time) dbUpdates.departure_time = merged.departure_time;
-      if (merged.trip_duration) dbUpdates.trip_duration = merged.trip_duration;
+      if (merged.departure_date && /^\d{4}-\d{2}-\d{2}$/.test(String(merged.departure_date))) {
+        dbUpdates.departure_date = merged.departure_date;
+      }
+      if (merged.trip_duration && !String(merged.trip_duration).startsWith('[')) {
+        // Preserve existing JSON trip array if present, or store duration string
+        if (!currentProfile.trip_duration || !String(currentProfile.trip_duration).startsWith('[')) {
+          dbUpdates.trip_duration = merged.trip_duration;
+        }
+      }
       if (merged.group_size) dbUpdates.group_size = merged.group_size;
       if (merged.travel_style) dbUpdates.travel_style = merged.travel_style;
       if (merged.hobbies) dbUpdates.hobbies = merged.hobbies;
       if (merged.music) dbUpdates.music = merged.music;
-      if (merged.buddy_gender) dbUpdates.buddy_gender = merged.buddy_gender;
       if (merged.noise_level) dbUpdates.noise_level = merged.noise_level;
       if (merged.sleep_schedule) dbUpdates.sleep_schedule = merged.sleep_schedule;
-      if (merged.travel_experience) dbUpdates.travel_experience = merged.travel_experience;
       if (merged.profile_complete !== undefined) dbUpdates.profile_complete = merged.profile_complete;
-      if (merged.sos_enabled !== undefined) dbUpdates.sos_enabled = merged.sos_enabled;
-      if (merged.checkin_interval) dbUpdates.checkin_interval = merged.checkin_interval;
 
       if (Object.keys(dbUpdates).length > 0) {
         const { error } = await supabase
@@ -458,6 +459,23 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Extract clean duration string if profile.trip_duration stores JSON trips array
+  const getCleanProfileDuration = (rawDur) => {
+    if (!rawDur) return null;
+    if (typeof rawDur === 'string' && rawDur.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(rawDur);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed[0].duration || '7 days';
+        }
+        return null;
+      } catch {
+        return '7 days';
+      }
+    }
+    return rawDur;
+  };
+
   // Build a user-like object that components expect
   const combinedUser = user && profile ? {
     id: user.id,
@@ -478,7 +496,7 @@ export function AuthProvider({ children }) {
       destination: profile.destination,
       departureDate: profile.departure_date,
       departureTime: profile.departure_time,
-      tripDuration: profile.trip_duration,
+      tripDuration: getCleanProfileDuration(profile.trip_duration),
       groupSize: profile.group_size,
       travelStyle: profile.travel_style,
     },

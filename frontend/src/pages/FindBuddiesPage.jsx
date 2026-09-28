@@ -7,6 +7,7 @@ import './FindBuddiesPage.css';
 
 const HOBBIES = ['Hiking', 'Photography', 'Foodie', 'Culture', 'Beach', 'Gaming', 'Reading', 'Yoga', 'Nightlife', 'Cycling'];
 const SORT_OPTIONS = [
+  { value: 'recent', label: '🕒 Recently Posted' },
   { value: 'compatibility', label: '🔥 Best Match' },
   { value: 'destination', label: '📍 Destination' },
   { value: 'date', label: '📅 Departure' },
@@ -24,7 +25,7 @@ export default function FindBuddiesPage() {
     hobby: '',
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState('compatibility');
+  const [sortBy, setSortBy] = useState('recent');
 
   const handleFilter = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -41,28 +42,48 @@ export default function FindBuddiesPage() {
     });
   };
 
-  const hasFilters = Object.values(filters).some(v => Boolean(v));
+  const hasFilters = Object.values(filters).some(v => Boolean(v && String(v).trim()));
 
-  // Find Buddies should ONLY show OTHER travelers' posts
+  // Helper: check if a trip belongs to the currently logged-in user
+  const isOwnTrip = (b) => {
+    if (!user) return false;
+    if (b.userId === user.id) return true;
+    if (String(b.userId).startsWith('local_') || String(b.userId).startsWith('user_')) return true;
+    return false;
+  };
+
+  // Find Buddies should ONLY show OTHER travelers' posts (sorted newest-first)
   // A user's own trips belong exclusively in the "My Trips" section
   const otherBuddies = useMemo(() => {
-    if (!user) return buddies;
-    return buddies.filter(b => b.userId !== user.id);
+    const list = user ? buddies.filter(b => !isOwnTrip(b)) : [...buddies];
+    return list.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeB - timeA;
+    });
   }, [buddies, user]);
 
   const filtered = useMemo(() => {
     if (hasFilters) {
+      // When searching by destination or using filters, search across ALL upcoming trips
       const searched = searchBuddies(filters);
-      if (!user) return searched;
-      return searched.filter(b => b.userId !== user.id);
+      return user ? searched.filter(b => !isOwnTrip(b)) : searched;
     }
-    return otherBuddies;
+    // Default live feed: show ONLY the 10 most recently posted trips across the website
+    return otherBuddies.slice(0, 10);
   }, [hasFilters, filters, searchBuddies, otherBuddies, user]);
 
   // Sort results
   const results = useMemo(() => {
     const sorted = [...filtered];
     switch (sortBy) {
+      case 'recent':
+        sorted.sort((a, b) => {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeB - timeA;
+        });
+        break;
       case 'compatibility':
         sorted.sort((a, b) => {
           const scoreA = calculateCompatibility(user, a);
@@ -86,7 +107,7 @@ export default function FindBuddiesPage() {
     return sorted;
   }, [filtered, sortBy, calculateCompatibility, user]);
 
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const activeFilterCount = Object.values(filters).filter(v => Boolean(v && String(v).trim())).length;
 
   return (
     <div className="find-page" id="find-buddies-page">
@@ -234,9 +255,20 @@ export default function FindBuddiesPage() {
 
         {/* Results Header with Sort */}
         <div className="find-page__results-header">
-          <span className="find-page__results-info">
-            {results.length} fellow traveler{results.length !== 1 ? 's' : ''} found
-          </span>
+          <div>
+            <span className="find-page__results-info">
+              {hasFilters ? (
+                <>🔍 {results.length} matching trip{results.length !== 1 ? 's' : ''} found across all travelers</>
+              ) : (
+                <>🟢 Showing {results.length} most recently posted trip{results.length !== 1 ? 's' : ''} (Top 10 Live Feed)</>
+              )}
+            </span>
+            {!hasFilters && (
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                New trips appear at the top automatically · Search your destination above to view all {otherBuddies.length > 10 ? `${otherBuddies.length} ` : ''}trips
+              </div>
+            )}
+          </div>
           <div className="find-page__sort">
             <span className="find-page__sort-label">Sort by:</span>
             {SORT_OPTIONS.map(opt => (

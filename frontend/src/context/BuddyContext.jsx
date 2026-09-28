@@ -123,12 +123,15 @@ export function BuddyProvider({ children }) {
       .filter(trip => {
         if (trip.status === 'completed') return false;
         const depDate = trip.departure_date || trip.departureDate;
-        const duration = trip.duration || trip.trip_duration || '7 days';
+        const rawDur = trip.duration || trip.trip_duration || '7 days';
+        const duration = typeof rawDur === 'string' && rawDur.trim().startsWith('[') ? '7 days' : rawDur;
         return matchesPreferenceDate(depDate, duration, null);
       })
       .map(trip => {
         const userId = trip.user_id || trip.userId;
         const profile = profiles[userId] || {};
+        const rawDur = trip.duration || trip.trip_duration || '7 days';
+        const cleanDur = typeof rawDur === 'string' && rawDur.trim().startsWith('[') ? '7 days' : rawDur;
 
         return {
           id: trip.id,
@@ -150,16 +153,21 @@ export function BuddyProvider({ children }) {
           departure_date: trip.departure_date || trip.departureDate,
           departureDate: trip.departure_date || trip.departureDate,
           return_date: trip.return_date,
-          trip_duration: trip.duration || trip.trip_duration || '7 days',
-          duration: trip.duration || trip.trip_duration || '7 days',
+          trip_duration: cleanDur,
+          duration: cleanDur,
           group_size: trip.group_size || trip.groupSize || '2',
           groupSize: trip.group_size || trip.groupSize || '2',
           travel_style: trip.travel_style || trip.travelStyle || 'Mid-range',
           travelStyle: trip.travel_style || trip.travelStyle || 'Mid-range',
           status: trip.status || 'active',
           profile_complete: true,
-          created_at: trip.created_at,
+          created_at: trip.created_at || profile.created_at || new Date().toISOString(),
         };
+      })
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
       });
   }, [trips, profiles]);
 
